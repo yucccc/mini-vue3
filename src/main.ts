@@ -13,14 +13,14 @@ effect(() => {
   document.body.innerText = obj.ok ? obj.text : 'not'
 })
 
-setTimeout(() => {
-  obj.ok = false
-}, 1000)
+// setTimeout(() => {
+//   obj.ok = false
+// }, 1000)
 
-setTimeout(() => {
-  obj.ok = true
-}, 2000)
+// setTimeout(() => {
+//   obj.ok = true
+// }, 2000)
 
-setTimeout(() => {
-  obj.ok = false
-}, 3000)
+// setTimeout(() => {
+//   obj.ok = false
+// }, 3000)
