@@ -34,19 +34,25 @@ export interface ReactiveEffectOptions {
  * @param fn
  * @param options
  */
-export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}): void {
+export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}) {
   const effectFn = () => {
     // 执行前将该副作用的收集依赖清除
     cleanupEffect(effectFn)
-
     // 目前存在的问题是永远只有一个副作用在执行
     activeEffect = effectFn
-    fn()
+    const res = fn()
+
+    return res
   }
   // 执行时给effectFn
   effectFn.deps = []
-  effectFn.options = {}
-  effectFn()
+  effectFn.options = options
+  // 目前用于computed 一开始不立刻执行
+
+  if (!options.lazy)
+    effectFn()
+
+  return effectFn
 }
 
 // 思考：执行这个副作用有什么用呢？ 答案：其实后面很多逻辑都是依靠于副作用的重新执行
@@ -81,7 +87,7 @@ export function track(target, key) {
 
 export function trigger(
   target: any,
-  key: string,
+  key: string | symbol,
   newValue?: unknown,
   oldValue?: unknown,
 ) {
