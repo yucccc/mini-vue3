@@ -1,6 +1,6 @@
 import { isArray, isObject } from '../shared'
 import { track, trigger } from './effect'
-
+export const ITERATE_KEY = Symbol('iterate')
 // export const mutableHandlers: ProxyHandler<object> = {
 //   get,
 //   set,
@@ -22,6 +22,7 @@ export function reactive<T extends object>(target: T): T {
       // 读取的时候 需要将副作用加入桶子里面
       get(target, key, receiver) {
         // const targetIsArray = isArray(target)
+
         track(target, key)
         const res = Reflect.get(target, key, receiver)
         // 如果是对象的是 需要递归代理为响应式
@@ -30,9 +31,13 @@ export function reactive<T extends object>(target: T): T {
         return res
       },
       set(target, key, value, receiver) {
-        const res = Reflect.set(target, key, value, receiver)
-        // 如果是数组的话 触发的key 是length
-        trigger(target, isArray(target) ? 'length' : key)
+        const oldValue = (target as any)[key]
+        let res = true
+        if (oldValue !== value) {
+          res = Reflect.set(target, key, value, receiver)
+          // 如果是数组的话 触发的key 是length
+          trigger(target, isArray(target) ? 'length' : key)
+        }
 
         return res
       },
@@ -50,7 +55,13 @@ export function reactive<T extends object>(target: T): T {
           trigger(target, key)
         return result
       },
-    },
+      // 见文档 https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/ownKeys
+      ownKeys(target) {
+        // 因为ownKeys无法拿到key 那么我们自定义一个ITERATE_KEY 用于代表iterate
+        track(target, ITERATE_KEY)
+        return Reflect.ownKeys(target)
+      },
+    } as ProxyHandler<any>,
   )
 
   return proxy

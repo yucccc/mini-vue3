@@ -41,7 +41,7 @@ describe('reactivity/effect', () => {
     expect(dummy1).toBe(1)
     expect(dummy2).toBe(1)
   })
-  // TODO 深度响应式
+  // 深度响应式
   it('should observe nested properties', () => {
     let dummy
     const counter = reactive({ nested: { num: 0 } })
@@ -149,7 +149,7 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe('World!')
   })
 
-  it('should observe implicit array length changes', () => {
+  it('should observe implicit array length changes 应该监测到长度的变化', () => {
     let dummy
     const list = reactive(['Hello'])
     effect(() => (dummy = list.join(' ')))
@@ -159,5 +159,125 @@ describe('reactivity/effect', () => {
     expect(dummy).toBe('Hello World!')
     list[3] = 'Hello!'
     expect(dummy).toBe('Hello World!  Hello!')
+  })
+
+  it('should observe sparse array mutations', () => {
+    let dummy
+    const list = reactive<string[]>([])
+    list[1] = 'World!'
+    effect(() => (dummy = list.join(' ')))
+
+    expect(dummy).toBe(' World!')
+    list[0] = 'Hello'
+    expect(dummy).toBe('Hello World!')
+    list.pop()
+    expect(dummy).toBe('Hello')
+  })
+
+  it('should observe enumeration 观察可枚举', () => {
+    let dummy = 0
+    const numbers = reactive<Record<string, number>>({ num1: 3 })
+    effect(() => {
+      dummy = 0
+      for (const key in numbers)
+        dummy += numbers[key]
+    })
+
+    expect(dummy).toBe(3)
+    numbers.num2 = 4
+    expect(dummy).toBe(7)
+    delete numbers.num1
+    expect(dummy).toBe(4)
+  })
+
+  it('should observe symbol keyed properties', () => {
+    const key = Symbol('symbol keyed prop')
+    let dummy, hasDummy
+    const obj = reactive({ [key]: 'value' })
+    effect(() => (dummy = obj[key]))
+    effect(() => (hasDummy = key in obj))
+
+    expect(dummy).toBe('value')
+    expect(hasDummy).toBe(true)
+    obj[key] = 'newValue'
+    expect(dummy).toBe('newValue')
+    // @ts-expect-error
+    delete obj[key]
+    expect(dummy).toBe(undefined)
+    expect(hasDummy).toBe(false)
+  })
+
+  it('should not observe well-known symbol keyed properties', () => {
+    const key = Symbol.isConcatSpreadable
+    let dummy
+    const array: any = reactive([])
+    effect(() => (dummy = array[key]))
+
+    expect(array[key]).toBe(undefined)
+    expect(dummy).toBe(undefined)
+    array[key] = true
+    expect(array[key]).toBe(true)
+    expect(dummy).toBe(undefined)
+  })
+
+  it('should observe function valued properties', () => {
+    const oldFunc = () => {}
+    const newFunc = () => {}
+
+    let dummy
+    const obj = reactive({ func: oldFunc })
+    effect(() => (dummy = obj.func))
+
+    expect(dummy).toBe(oldFunc)
+    obj.func = newFunc
+    expect(dummy).toBe(newFunc)
+  })
+
+  it('should observe chained getters relying on this', () => {
+    const obj = reactive({
+      a: 1,
+      get b() {
+        return this.a
+      },
+    })
+
+    let dummy
+    effect(() => (dummy = obj.b))
+    expect(dummy).toBe(1)
+    obj.a++
+    expect(dummy).toBe(2)
+  })
+
+  it('should observe methods relying on this', () => {
+    const obj = reactive({
+      a: 1,
+      b() {
+        return this.a
+      },
+    })
+
+    let dummy
+    effect(() => (dummy = obj.b()))
+    expect(dummy).toBe(1)
+    obj.a++
+    expect(dummy).toBe(2)
+  })
+
+  it('should not observe set operations without a value change', () => {
+    let hasDummy, getDummy
+    const obj = reactive({ prop: 'value' })
+
+    const getSpy = jest.fn(() => (getDummy = obj.prop))
+    const hasSpy = jest.fn(() => (hasDummy = 'prop' in obj))
+    effect(getSpy)
+    effect(hasSpy)
+
+    expect(getDummy).toBe('value')
+    expect(hasDummy).toBe(true)
+    obj.prop = 'value'
+    expect(getSpy).toHaveBeenCalledTimes(1)
+    expect(hasSpy).toHaveBeenCalledTimes(1)
+    expect(getDummy).toBe('value')
+    expect(hasDummy).toBe(true)
   })
 })

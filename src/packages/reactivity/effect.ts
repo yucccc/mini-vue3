@@ -1,3 +1,5 @@
+import { isArray } from '../shared'
+import { ITERATE_KEY } from './reactive'
 
 // 桶子最终的数据格式如下
 const test_target = { o: 1 }
@@ -32,10 +34,10 @@ export interface ReactiveEffectOptions {
  * @param fn
  * @param options
  */
-export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): void {
+export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}): void {
   const effectFn = () => {
     // 执行前将该副作用的收集依赖清除
-    // cleanupEffect(effectFn)
+    cleanupEffect(effectFn)
 
     // 目前存在的问题是永远只有一个副作用在执行
     activeEffect = effectFn
@@ -43,7 +45,7 @@ export function effect<T = any>(fn: () => T, options?: ReactiveEffectOptions): v
   }
   // 执行时给effectFn
   effectFn.deps = []
-
+  effectFn.options = {}
   effectFn()
 }
 
@@ -77,12 +79,34 @@ export function track(target, key) {
   activeEffect.deps.push(deps)
 }
 
-export function trigger(target, key) {
+export function trigger(
+  target: any,
+  key: string,
+  newValue?: unknown,
+  oldValue?: unknown,
+) {
   const depsMap = bucket.get(target)
   if (!depsMap) return
+
   const effects = depsMap.get(key)
-  const effectsToRun = new Set(effects)
-  effectsToRun.forEach(fn => fn())
+
+  // 把ITERATE_KEY也取出来执行
+  const iterateEffects = depsMap.get(ITERATE_KEY)
+  const effectsToRun = new Set()
+
+  effects && effects.forEach((effectFn) => {
+    effectsToRun.add(effectFn)
+  })
+  iterateEffects && iterateEffects.forEach((effectFn) => {
+    effectsToRun.add(effectFn)
+  })
+
+  effectsToRun.forEach((effectFn) => {
+    if (effectFn.options.scheduler)
+      effectFn.options.scheduler()
+    else
+      effectFn()
+  })
 }
 
 export function cleanupEffect(effect) {
