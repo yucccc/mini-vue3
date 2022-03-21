@@ -79,7 +79,7 @@ export function track(target, key) {
 
 export function trigger(target, key) {
   const depsMap = bucket.get(target)
-  if (!depsMap) return true
+  if (!depsMap) return
   const effects = depsMap.get(key)
   const effectsToRun = new Set(effects)
   effectsToRun.forEach(fn => fn())
