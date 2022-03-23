@@ -7,8 +7,6 @@ const originalObj = { text: 'hello vue3', ok: true }
 const obj = reactive(originalObj)
 
 effect(() => {
-  console.log('作用用被执行')
-
   // 执行的时候响应式对象会被收集 等再次更新的时候 副作用函数会被再次执行
   document.body.innerText = obj.ok ? obj.text : 'not'
 })

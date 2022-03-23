@@ -1,23 +1,23 @@
-import { isArray } from '../shared'
+// import { isArray } from '../shared'
 import { ITERATE_KEY } from './reactive'
 
 // 桶子最终的数据格式如下
-const test_target = { o: 1 }
+// const test_target = { o: 1 }
 // 最外面一层是WeakMap
-const test = new WeakMap([
-  // WeakMap 由target和Map组成
-  [
-    test_target,
-    new Map([
-      ['o', new Set()],
-    ]),
-  ],
-])
+// const test = new WeakMap([
+//   // WeakMap 由target和Map组成
+//   [
+//     test_target,
+//     new Map([
+//       ['o', new Set()],
+//     ]),
+//   ],
+// ])
 type KeyToDepMap = Map<any, Set<any>>
 const bucket = new WeakMap<any, KeyToDepMap>()
 
 // 当前激活的副作用函数
-export let activeEffect
+export let activeEffect: Function
 
 export interface ReactiveEffectOptions {
   lazy?: boolean
