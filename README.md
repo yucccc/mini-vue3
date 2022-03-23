@@ -12,6 +12,9 @@
 
 1、项目由vite vanilla 模板生成 没有花里胡哨的东西 主要聚焦于实现vue3 具体见 [搭建第一个 Vite 项目](https://vitejs.cn/guide/#scaffolding-your-first-vite-project)
 
+2、项目的test严格按照vue3的测试用例执行 可以说是vue需要跑通的 在本项目中尽量补全跑通
+
+3、由于v3做了很多优化 因此代码看起来相对复杂影响学习 本项目尽量按照v3的实现 进行了逻辑思想的精简
 
 ## 实现
 

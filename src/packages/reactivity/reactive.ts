@@ -1,6 +1,6 @@
 import { isArray, isObject } from '../shared'
-import { track, trigger } from './effect'
-export const ITERATE_KEY = Symbol('iterate')
+import { TriggerOpTypes, track, trigger } from './effect'
+export const ITERATE_KEY = Symbol('')
 // export const mutableHandlers: ProxyHandler<object> = {
 //   get,
 //   set,
@@ -22,7 +22,6 @@ export function reactive<T extends object>(target: T): T {
       // 读取的时候 需要将副作用加入桶子里面
       get(target, key, receiver) {
         // const targetIsArray = isArray(target)
-
         track(target, key)
         const res = Reflect.get(target, key, receiver)
         // 如果是对象的是 需要递归代理为响应式
@@ -30,13 +29,17 @@ export function reactive<T extends object>(target: T): T {
           return reactive(res)
         return res
       },
-      set(target, key, value, receiver) {
+      set(target, key, newValue, receiver) {
         const oldValue = (target as any)[key]
+        // 如果要设置的值存在 那么就是设置 否则就是新增 用于判断是否需要重新执行循环等 只有add才会执行ITERATE_KEY的关联逻辑
+        const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
+
         let res = true
-        if (oldValue !== value) {
-          res = Reflect.set(target, key, value, receiver)
+        // NaN问题改为Object.is
+        if (!Object.is(newValue, oldValue)) {
+          res = Reflect.set(target, key, newValue, receiver)
           // 如果是数组的话 触发的key 是length
-          trigger(target, isArray(target) ? 'length' : key)
+          trigger(target, isArray(target) ? 'length' : key, type)
         }
 
         return res

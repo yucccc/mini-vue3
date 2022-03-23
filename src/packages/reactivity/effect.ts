@@ -64,6 +64,12 @@ export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}
 // //  修改obj.text 当值变化的时候 重新执行下副作用effect 修改document.body.innerText
 // obj.text = 'hello vite'
 
+export const enum TriggerOpTypes {
+  SET = 'set',
+  ADD = 'add',
+  DELETE = 'delete',
+  CLEAR = 'clear',
+}
 export function track(target, key) {
   if (!activeEffect) return
 
@@ -88,6 +94,7 @@ export function track(target, key) {
 export function trigger(
   target: any,
   key: string | symbol,
+  type: TriggerOpTypes,
   newValue?: unknown,
   oldValue?: unknown,
 ) {
@@ -96,16 +103,19 @@ export function trigger(
 
   const effects = depsMap.get(key)
 
-  // 把ITERATE_KEY也取出来执行
-  const iterateEffects = depsMap.get(ITERATE_KEY)
   const effectsToRun = new Set()
-
+  // TODO 一旦判断是否等于activeEffect就有问题 待查看
   effects && effects.forEach((effectFn) => {
     effectsToRun.add(effectFn)
   })
-  iterateEffects && iterateEffects.forEach((effectFn) => {
-    effectsToRun.add(effectFn)
-  })
+  // 新增或者减少都会导致for循环的次数变更 所以需要重新执行
+  if (type === TriggerOpTypes.ADD || type === TriggerOpTypes.DELETE) {
+    // 把ITERATE_KEY取出来执行
+    const iterateEffects = depsMap.get(ITERATE_KEY)
+    iterateEffects && iterateEffects.forEach((effectFn) => {
+      effectsToRun.add(effectFn)
+    })
+  }
 
   effectsToRun.forEach((effectFn) => {
     if (effectFn.options.scheduler)
