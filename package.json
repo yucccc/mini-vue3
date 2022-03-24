@@ -2,6 +2,7 @@
   "name": "easy-vue3",
   "version": "0.0.0",
   "private": true,
+  "keywords": ["vue3-source", "easy-vue", "vue3", "study-vue", "mini-vue3"],
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
