@@ -14,14 +14,17 @@ export const ITERATE_KEY = Symbol('')
 // function createGetter() {
 // }
 
-function createReactive<T extends object>(target: T, isShallow = false): T {
+function createReactiveObject<T extends object>(target: T, isShallow = false, isReadOnly = false): T {
   const proxy = new Proxy(
     target,
     {
       // 读取的时候 需要将副作用加入桶子里面
       get(target, key, receiver) {
         // const targetIsArray = isArray(target)
-        track(target, key)
+        // 非只读才建立联系
+        if (!isReadOnly)
+          track(target, key)
+
         const res = Reflect.get(target, key, receiver)
         // if (key === 'raw')
         //   return target
@@ -30,7 +33,8 @@ function createReactive<T extends object>(target: T, isShallow = false): T {
 
         // 如果是对象的是 需要递归代理为响应式
         if (isObject(res))
-          return reactive(res)
+        // 处理深只读和深响应
+          return isReadOnly ? readonly(res) : reactive(res)
 
         return res
       },
@@ -40,6 +44,10 @@ function createReactive<T extends object>(target: T, isShallow = false): T {
         const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
 
         let res = true
+        if (isReadOnly) {
+          console.warn(`${key} 是只读的`)
+          return res
+        }
         // if (target === receiver.raw) {
         // NaN问题改为Object
         if (!Object.is(newValue, oldValue)) {
@@ -59,6 +67,11 @@ function createReactive<T extends object>(target: T, isShallow = false): T {
       },
       // 拦截delete 操作符 见文档： https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/deleteProperty
       deleteProperty(target, key) {
+        if (isReadOnly) {
+          console.warn(`${key} 是只读的`)
+          return true
+        }
+
         const result = Reflect.deleteProperty(target, key)
         // 真的有被删除成功再触发通知
         if (result)
@@ -78,9 +91,18 @@ function createReactive<T extends object>(target: T, isShallow = false): T {
 }
 // 创建一个响应式对象
 export function reactive<T extends object>(target: T): T {
-  return createReactive(target)
+  return createReactiveObject(target)
 }
 // 浅响应
 export function shallowReactive(target: object): object {
-  return createReactive(target, true)
+  return createReactiveObject(target, true)
+}
+// 浅只读
+export function shallowReadonly(target: object): object {
+  return createReactiveObject(target, true, true)
+}
+
+// 深只读
+export function readonly(target: object): object {
+  return createReactiveObject(target, false, true)
 }
