@@ -12,10 +12,9 @@ export const ITERATE_KEY = Symbol('')
 // const get = createGetter()
 
 // function createGetter() {
-
 // }
-// 创建一个响应式对象
-export function reactive<T extends object>(target: T): T {
+
+function createReactive<T extends object>(target: T, isShallow = false): T {
   const proxy = new Proxy(
     target,
     {
@@ -24,9 +23,15 @@ export function reactive<T extends object>(target: T): T {
         // const targetIsArray = isArray(target)
         track(target, key)
         const res = Reflect.get(target, key, receiver)
+        // if (key === 'raw')
+        //   return target
+        if (isShallow)
+          return res
+
         // 如果是对象的是 需要递归代理为响应式
         if (isObject(res))
           return reactive(res)
+
         return res
       },
       set(target, key, newValue, receiver) {
@@ -35,12 +40,14 @@ export function reactive<T extends object>(target: T): T {
         const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
 
         let res = true
-        // NaN问题改为Object.is
+        // if (target === receiver.raw) {
+        // NaN问题改为Object
         if (!Object.is(newValue, oldValue)) {
           res = Reflect.set(target, key, newValue, receiver)
           // 如果是数组的话 触发的key 是length
           trigger(target, isArray(target) ? 'length' : key, type)
         }
+        // }
 
         return res
       },
@@ -55,7 +62,7 @@ export function reactive<T extends object>(target: T): T {
         const result = Reflect.deleteProperty(target, key)
         // 真的有被删除成功再触发通知
         if (result)
-          trigger(target, key)
+          trigger(target, key, TriggerOpTypes.DELETE)
         return result
       },
       // 见文档 https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/ownKeys
@@ -68,4 +75,12 @@ export function reactive<T extends object>(target: T): T {
   )
 
   return proxy
+}
+// 创建一个响应式对象
+export function reactive<T extends object>(target: T): T {
+  return createReactive(target)
+}
+// 浅响应
+export function shallowReactive(target: object): object {
+  return createReactive(target, true)
 }

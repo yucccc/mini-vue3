@@ -54,11 +54,10 @@ describe('reactivity/effect', () => {
 
   it('should observe has operations', () => {
     let dummy
-    const obj = reactive<{ prop: string | number }>({ prop: 'value' })
+    const obj = reactive<{ prop?: string | number }>({ prop: 'value' })
     effect(() => (dummy = 'prop' in obj))
 
     expect(dummy).toBe(true)
-    // // @ts-expect-error
     delete obj.prop
     expect(dummy).toBe(false)
     obj.prop = 12
@@ -67,13 +66,12 @@ describe('reactivity/effect', () => {
 
   it('should observe properties on the prototype chain', () => {
     let dummy
-    const counter = reactive({ num: 0 })
+    const counter = reactive<{ num?: number }>({ num: 0 })
     const parentCounter = reactive({ num: 2 })
     Object.setPrototypeOf(counter, parentCounter)
     effect(() => (dummy = counter.num))
 
     expect(dummy).toBe(0)
-    // @ts-expect-error
     delete counter.num
     expect(dummy).toBe(2)
     parentCounter.num = 4
@@ -83,16 +81,14 @@ describe('reactivity/effect', () => {
   })
   it('should observe has operations on the prototype chain', () => {
     let dummy
-    const counter = reactive({ num: 0 })
-    const parentCounter = reactive({ num: 2 })
+    const counter = reactive<{ num?: number }>({ num: 0 })
+    const parentCounter = reactive<{ num?: number }>({ num: 2 })
     Object.setPrototypeOf(counter, parentCounter)
     effect(() => (dummy = 'num' in counter))
 
     expect(dummy).toBe(true)
-    // @ts-expect-error
     delete counter.num
     expect(dummy).toBe(true)
-    // @ts-expect-error
     delete parentCounter.num
     expect(dummy).toBe(false)
     counter.num = 3

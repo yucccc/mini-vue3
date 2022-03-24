@@ -1,4 +1,4 @@
-import { effect, track, trigger } from './effect'
+import { TriggerOpTypes, effect, track, trigger } from './effect'
 export function computed(getter) {
   // 标识是否脏数据 默认true需要重新计算
   let _dirty = true
@@ -10,7 +10,7 @@ export function computed(getter) {
     scheduler() {
       // 当值发生变化的时候
       _dirty = true
-      trigger(obj, 'value')
+      trigger(obj, 'value', TriggerOpTypes.SET)
     },
   })
   const obj = {

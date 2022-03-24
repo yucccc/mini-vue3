@@ -41,14 +41,13 @@ export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}
     // 目前存在的问题是永远只有一个副作用在执行
     activeEffect = effectFn
     const res = fn()
-
     return res
   }
   // 执行时给effectFn
   effectFn.deps = []
   effectFn.options = options
-  // 目前用于computed 一开始不立刻执行
 
+  // 目前用于computed 一开始不立刻执行
   if (!options.lazy)
     effectFn()
 
