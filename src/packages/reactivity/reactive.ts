@@ -39,15 +39,18 @@ function createReactiveObject<T extends object>(target: T, isShallow = false, is
         return res
       },
       set(target, key, newValue, receiver) {
-        const oldValue = (target as any)[key]
-        // 如果要设置的值存在 那么就是设置 否则就是新增 用于判断是否需要重新执行循环等 只有add才会执行ITERATE_KEY的关联逻辑
-        const type = Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
-
         let res = true
         if (isReadOnly) {
           console.warn(`${key} 是只读的`)
           return res
         }
+
+        const oldValue = (target as any)[key]
+        // 如果要设置的值存在 那么就是设置 否则就是新增 用于判断是否需要重新执行循环等 只有add才会执行ITERATE_KEY的关联逻辑
+        const type = Array.isArray(target)
+          ? typeof key !== 'symbol' && Number(key) < target.length ? TriggerOpTypes.SET : TriggerOpTypes.ADD
+          : Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
+
         // if (target === receiver.raw) {
         // NaN问题改为Object
         if (!Object.is(newValue, oldValue)) {
