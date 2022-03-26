@@ -14,7 +14,25 @@ export const ITERATE_KEY = Symbol('')
 // function createGetter() {
 // }
 
-function createReactiveObject<T extends object>(target: T, isShallow = false, isReadOnly = false): T {
+function createReactiveObject<T extends object>(
+  target: T,
+  isShallow: boolean,
+  isReadOnly: boolean,
+  /**
+   * 存储创建后的响应式对象 防止多次创建
+   */
+  proxyMap: WeakMap<any, any>): T {
+  // 做点容错吧
+  if (!isObject(target)) {
+    console.warn(`value cannot be made reactive: ${String(target)}`)
+    return target
+  }
+  // target already has corresponding Proxy
+  const existingProxy = proxyMap.get(target)
+
+  if (existingProxy)
+    return existingProxy
+
   const proxy = new Proxy(
     target,
     {
@@ -56,7 +74,7 @@ function createReactiveObject<T extends object>(target: T, isShallow = false, is
         if (!Object.is(newValue, oldValue)) {
           res = Reflect.set(target, key, newValue, receiver)
           // 如果是数组的话 触发的key 是length
-          trigger(target, isArray(target) ? 'length' : key, type)
+          trigger(target, isArray(target) ? 'length' : key, type, newValue)
         }
         // }
 
@@ -84,28 +102,33 @@ function createReactiveObject<T extends object>(target: T, isShallow = false, is
       // 见文档 https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/ownKeys
       ownKeys(target) {
         // 因为ownKeys无法拿到key 那么我们自定义一个ITERATE_KEY 用于代表iterate
-        track(target, ITERATE_KEY)
+        track(target, Array.isArray(target) ? 'length' : ITERATE_KEY)
         return Reflect.ownKeys(target)
       },
     } as ProxyHandler<any>,
   )
-
+  proxyMap.set(target, proxy)
   return proxy
 }
+// 防止每次创建新的响应式对象
+export const reactiveMap = new WeakMap<any, any>()
+export const shallowReactiveMap = new WeakMap<any, any>()
+export const readonlyMap = new WeakMap<any, any>()
+export const shallowReadonlyMap = new WeakMap<any, any>()
 // 创建一个响应式对象
 export function reactive<T extends object>(target: T): T {
-  return createReactiveObject(target)
+  return createReactiveObject(target, false, false, reactiveMap)
 }
 // 浅响应
 export function shallowReactive(target: object): object {
-  return createReactiveObject(target, true)
-}
-// 浅只读
-export function shallowReadonly(target: object): object {
-  return createReactiveObject(target, true, true)
+  return createReactiveObject(target, true, false, shallowReactiveMap)
 }
 
 // 深只读
 export function readonly(target: object): object {
-  return createReactiveObject(target, false, true)
+  return createReactiveObject(target, false, true, readonlyMap)
+}
+// 浅只读
+export function shallowReadonly(target: object): object {
+  return createReactiveObject(target, true, true, shallowReadonlyMap)
 }

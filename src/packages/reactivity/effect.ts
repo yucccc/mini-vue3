@@ -115,6 +115,20 @@ export function trigger(
       effectsToRun.add(effectFn)
     })
   }
+  // 如果是数组并且修改了数组的length属性
+  if (Array.isArray(target) && key === 'length' && typeof newValue !== 'symbol') {
+    // 索引大于或者等于新length的元素
+    // 需要吧相关联的副作用函数取出来并添加到effectToRun中待执行
+    depsMap.forEach((effects, key) => {
+      if (typeof key !== 'symbol') { // 这个symbol后期需要优化判断
+        if (key >= (newValue as number)) {
+          effects.forEach((effectFn) => {
+            effectsToRun.add(effectFn)
+          })
+        }
+      }
+    })
+  }
 
   effectsToRun.forEach((effectFn) => {
     if (effectFn.options.scheduler)
