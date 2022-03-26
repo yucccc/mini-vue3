@@ -1,4 +1,4 @@
-// import { isArray } from '../shared'
+import { isArray } from '../shared'
 import { ITERATE_KEY } from './reactive'
 
 // 桶子最终的数据格式如下
@@ -18,7 +18,14 @@ const bucket = new WeakMap<any, KeyToDepMap>()
 
 // 当前激活的副作用函数
 export let activeEffect: Function
+export let shouldTrack = true
+export function pauseTracking() {
+  shouldTrack = false
+}
 
+export function enableTracking() {
+  shouldTrack = true
+}
 export interface ReactiveEffectOptions {
   lazy?: boolean
   scheduler?: Function
@@ -70,7 +77,7 @@ export const enum TriggerOpTypes {
   CLEAR = 'clear',
 }
 export function track(target, key) {
-  if (!activeEffect) return
+  if (!activeEffect || !shouldTrack) return
 
   let depsMap = bucket.get(target)
 
@@ -116,7 +123,7 @@ export function trigger(
     })
   }
   // 如果是数组并且修改了数组的length属性
-  if (Array.isArray(target) && key === 'length' && typeof newValue !== 'symbol') {
+  if (isArray(target) && key === 'length' && typeof newValue !== 'symbol') {
     // 索引大于或者等于新length的元素
     // 需要吧相关联的副作用函数取出来并添加到effectToRun中待执行
     depsMap.forEach((effects, key) => {

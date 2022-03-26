@@ -331,28 +331,28 @@ describe('reactivity/effect', () => {
   //   expect(counterSpy).toHaveBeenCalledTimes(2)
   // })
 
-  // it('should avoid infinite recursive loops when use Array.prototype.push/unshift/pop/shift', () => {
-  //   (['push', 'unshift'] as const).forEach((key) => {
-  //     const arr = reactive<number[]>([])
-  //     const counterSpy1 = jest.fn(() => (arr[key] as any)(1))
-  //     const counterSpy2 = jest.fn(() => (arr[key] as any)(2))
-  //     effect(counterSpy1)
-  //     effect(counterSpy2)
-  //     expect(arr.length).toBe(2)
-  //     expect(counterSpy1).toHaveBeenCalledTimes(1)
-  //     expect(counterSpy2).toHaveBeenCalledTimes(1)
-  //   })
-  //   ;(['pop', 'shift'] as const).forEach((key) => {
-  //     const arr = reactive<number[]>([1, 2, 3, 4])
-  //     const counterSpy1 = jest.fn(() => (arr[key] as any)())
-  //     const counterSpy2 = jest.fn(() => (arr[key] as any)())
-  //     effect(counterSpy1)
-  //     effect(counterSpy2)
-  //     expect(arr.length).toBe(2)
-  //     expect(counterSpy1).toHaveBeenCalledTimes(1)
-  //     expect(counterSpy2).toHaveBeenCalledTimes(1)
-  //   })
-  // })
+  it('should avoid infinite recursive loops when use Array.prototype.push/unshift/pop/shift', () => {
+    (['push', 'unshift'] as const).forEach((key) => {
+      const arr = reactive<number[]>([])
+      const counterSpy1 = jest.fn(() => (arr[key] as any)(1))
+      const counterSpy2 = jest.fn(() => (arr[key] as any)(2))
+      effect(counterSpy1)
+      effect(counterSpy2)
+      expect(arr.length).toBe(2)
+      expect(counterSpy1).toHaveBeenCalledTimes(1)
+      expect(counterSpy2).toHaveBeenCalledTimes(1)
+    })
+    ;(['pop', 'shift'] as const).forEach((key) => {
+      const arr = reactive<number[]>([1, 2, 3, 4])
+      const counterSpy1 = jest.fn(() => (arr[key] as any)())
+      const counterSpy2 = jest.fn(() => (arr[key] as any)())
+      effect(counterSpy1)
+      effect(counterSpy2)
+      expect(arr.length).toBe(2)
+      expect(counterSpy1).toHaveBeenCalledTimes(1)
+      expect(counterSpy2).toHaveBeenCalledTimes(1)
+    })
+  })
 
   // it('should allow explicitly recursive raw function loops', () => {
   //   const counter = reactive({ num: 0 })

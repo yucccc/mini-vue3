@@ -1,5 +1,5 @@
 import { isArray, isObject } from '../shared'
-import { TriggerOpTypes, track, trigger } from './effect'
+import { TriggerOpTypes, enableTracking, pauseTracking, track, trigger } from './effect'
 export const ITERATE_KEY = Symbol('')
 // export const mutableHandlers: ProxyHandler<object> = {
 //   get,
@@ -14,6 +14,37 @@ export const ITERATE_KEY = Symbol('')
 // function createGetter() {
 // }
 
+/**
+ * 重写数组操作方法
+ */
+const arrayInstrumentation = createArrayInstrumentation()
+function createArrayInstrumentation() {
+  const instrumentations: Record<string, Function> = {}
+  // as const 意思为 将类型推断为 readonly ['includes', 'indexOf', 'lastIndexOf'] 固定了的意思
+  ;(['includes', 'indexOf', 'lastIndexOf'] as const).forEach((method) => {
+    const originMethod = Array.prototype[method]
+    instrumentations[method] = function(...args: unknown[]) {
+      // this 是代理对象 先在代理对象中查找
+      const res = originMethod.apply(this, args)
+      // 没找到
+      if (res === -1 || res === false)
+        return originMethod.apply(this.raw, args)
+
+      return res
+    }
+  })
+  ;(['push', 'unshift', 'pop', 'shift', 'splice'] as const).forEach((method) => {
+    const originMethod = Array.prototype[method]
+    instrumentations[method] = function(this: unknown[], ...args: unknown[]) {
+      pauseTracking()
+      const res = originMethod.apply(this, args)
+      enableTracking()
+      return res
+    }
+  })
+
+  return instrumentations
+}
 function createReactiveObject<T extends object>(
   target: T,
   isShallow: boolean,
@@ -39,9 +70,13 @@ function createReactiveObject<T extends object>(
       // 读取的时候 需要将副作用加入桶子里面
       get(target, key, receiver) {
         // const targetIsArray = isArray(target)
+        if (key === 'raw') return target
         // 非只读才建立联系
         if (!isReadOnly)
           track(target, key)
+
+        if (isArray(target) && Object.prototype.hasOwnProperty.call(arrayInstrumentation, key))
+          return Reflect.get(arrayInstrumentation, key, receiver)
 
         const res = Reflect.get(target, key, receiver)
         // if (key === 'raw')
@@ -65,7 +100,7 @@ function createReactiveObject<T extends object>(
 
         const oldValue = (target as any)[key]
         // 如果要设置的值存在 那么就是设置 否则就是新增 用于判断是否需要重新执行循环等 只有add才会执行ITERATE_KEY的关联逻辑
-        const type = Array.isArray(target)
+        const type = isArray(target)
           ? typeof key !== 'symbol' && Number(key) < target.length ? TriggerOpTypes.SET : TriggerOpTypes.ADD
           : Object.prototype.hasOwnProperty.call(target, key) ? TriggerOpTypes.SET : TriggerOpTypes.ADD
 
@@ -102,7 +137,7 @@ function createReactiveObject<T extends object>(
       // 见文档 https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/ownKeys
       ownKeys(target) {
         // 因为ownKeys无法拿到key 那么我们自定义一个ITERATE_KEY 用于代表iterate
-        track(target, Array.isArray(target) ? 'length' : ITERATE_KEY)
+        track(target, isArray(target) ? 'length' : ITERATE_KEY)
         return Reflect.ownKeys(target)
       },
     } as ProxyHandler<any>,
