@@ -94,7 +94,7 @@ function createReactiveObject<T extends object>(
       set(target, key, newValue, receiver) {
         let res = true
         if (isReadOnly) {
-          console.warn(`${key} 是只读的`)
+          console.warn(`${String(key)} 是只读的`)
           return res
         }
 
