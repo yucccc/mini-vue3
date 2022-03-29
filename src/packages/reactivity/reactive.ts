@@ -79,8 +79,7 @@ function createReactiveObject<T extends object>(
           return Reflect.get(arrayInstrumentation, key, receiver)
 
         const res = Reflect.get(target, key, receiver)
-        // if (key === 'raw')
-        //   return target
+
         if (isShallow)
           return res
 

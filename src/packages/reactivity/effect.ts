@@ -3,15 +3,22 @@ import { ITERATE_KEY } from './reactive'
 
 // 桶子最终的数据格式如下
 // const test_target = { o: 1 }
-// 最外面一层是WeakMap
+// // 最外面一层是WeakMap
 // const test = new WeakMap([
 //   // WeakMap 由target和Map组成
 //   [
 //     test_target,
 //     new Map([
-//       ['o', new Set()],
+//       ['o', new Set(['effect1', 'effect2'])],
 //     ]),
 //   ],
+// [
+//     test_target2,
+//     new Map([
+//       ['o', new Set(['effect1', 'effect2'])],
+//     ]),
+//   ],
+
 // ])
 type KeyToDepMap = Map<any, Set<any>>
 const bucket = new WeakMap<any, KeyToDepMap>()
@@ -36,6 +43,8 @@ export interface ReactiveEffectOptions {
 
 // 逻辑上其实我们只需要将数据变成响应式的 那么当
 
+// effect 栈
+const effectStack = []
 /**
  * 副作用实现
  * @param fn
@@ -45,9 +54,13 @@ export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}
   const effectFn = () => {
     // 执行前将该副作用的收集依赖清除
     cleanupEffect(effectFn)
-    // 目前存在的问题是永远只有一个副作用在执行
     activeEffect = effectFn
+    // 在调用副作用函数之前将当前副作用函数压栈
+    effectStack.push(effectFn)
     const res = fn()
+    // 在当前副作用函数执行完毕后，将当前副作用函数弹出栈，并还原 activeEffect 为之前的值
+    effectStack.pop()
+    activeEffect = effectStack[effectStack.length - 1]
     return res
   }
   // 执行时给effectFn
@@ -110,9 +123,11 @@ export function trigger(
   const effects = depsMap.get(key)
 
   const effectsToRun = new Set()
+
   // TODO 一旦判断是否等于activeEffect就有问题 待查看
   effects && effects.forEach((effectFn) => {
-    effectsToRun.add(effectFn)
+    if (effectFn !== activeEffect)
+      effectsToRun.add(effectFn)
   })
   // 新增或者减少都会导致for循环的次数变更 所以需要重新执行
   if (type === TriggerOpTypes.ADD || type === TriggerOpTypes.DELETE) {
@@ -130,7 +145,8 @@ export function trigger(
       if (typeof key !== 'symbol') { // 这个symbol后期需要优化判断
         if (key >= (newValue as number)) {
           effects.forEach((effectFn) => {
-            effectsToRun.add(effectFn)
+            if (effectFn !== activeEffect)
+              effectsToRun.add(effectFn)
           })
         }
       }
