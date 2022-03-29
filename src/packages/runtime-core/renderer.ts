@@ -1,3 +1,4 @@
+import { isString } from '../shared/index'
 /**
  * 渲染器
  * 渲染器的作用：把虚拟dom渲染为特定平台上的真实元素
@@ -8,7 +9,33 @@
  */
 
 // 创建一个渲染器
-export function createRenderer() {
+export function createRenderer(options) {
+  const { createElement, setElementText, insert } = options
+  /**
+ *
+ * @param n1 旧节点
+ * @param n2 新节点
+ * @param container 挂载的容器
+ */
+  function patch(n1, n2, container) {
+  // 没有旧节点的时候 以为着要挂载
+    if (!n1)
+      mountElement(n2, container)
+
+    else
+      console.log('打补丁')
+
+    // 打补丁
+  }
+
+  function mountElement(vnode, container) {
+    const el = createElement(vnode.type)
+
+    if (isString(vnode.children))
+      setElementText(el, vnode.children)
+    insert(el, container)
+  }
+
   function render(vnode, container) {
     // 当有要渲染的
     if (vnode) {
@@ -22,9 +49,16 @@ export function createRenderer() {
     // 存储本次渲染的vnode
     container._vnode = vnode
   }
-  return render
+  return {
+    render,
+  }
 }
-
-export function patch(n1, n2, container) {
-
+export const nodeOptions = {
+  createElement: tag => document.createElement(tag),
+  setElementText(el, text) {
+    el.textContent = text
+  },
+  insert(el, parent: Document, anchor = null) {
+    parent.insertBefore(el, anchor)
+  },
 }
