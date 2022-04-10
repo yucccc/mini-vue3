@@ -1,0 +1,5 @@
+describe('shared/index', () => {
+  it('', () => {
+
+  })
+})
