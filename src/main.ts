@@ -18,31 +18,27 @@ const vnode = {
   ],
 }
 
-// const vnode2 = {
-//   type: 'h1',
-//   // 使用props描述元素属性
-//   props: {
-//     id: 'foo',
-//     disabled: '',
-//   },
-//   children: [
-//     { type: 'span', children: 'hello vue3' },
-//   ],
-// }
+const vnode2 = {
+  type: {},
+  // 使用props描述元素属性
+  props: { form: 'input form' },
+}
 
 const obj = reactive(vnode)
+const obj2 = reactive(vnode2)
 
 effect(() => {
   // 执行的时候响应式对象会被收集 等再次更新的时候 副作用函数会被再次执行
   // document.body.innerText = obj.ok ? obj.text : 'not'
   renderer.render(obj, document.querySelector('#app'))
+  // renderer.render(obj2, document.querySelector('#app'))
 })
 
 // setTimeout(() => { vnode.children = 'hello patch vue3 => vue4' }, 1000)
 
-// setTimeout(() => {
-//   obj.ok = false
-// }, 1000)
+setTimeout(() => {
+  obj.type = 'input'
+}, 1000)
 
 // setTimeout(() => {
 //   obj.ok = true

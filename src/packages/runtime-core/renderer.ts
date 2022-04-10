@@ -1,4 +1,4 @@
-import { isArray, isString } from '../shared/index'
+import { isArray, isPlainObject, isString } from '../shared/index'
 
 function shouldSetAsProps(el, key, value) {
   if (key === 'form' && el.tagName === 'INPUT') return false
@@ -48,18 +48,36 @@ export function createRenderer(options) {
    * @param container 挂载的容器
    */
   function patch(n1, n2, container) {
-  // 没有旧节点的时候 认为要挂载
-    if (!n1)
-      mountElement(n2, container)
-
-    else
-      console.log('打补丁')
+    if (n1 === n2) return
+    // 如果新旧的类型都不同了 那么就没必要打补丁了
+    if (n1 && n1.type !== n2.type) {
+      unmount(n1)
+      n1 = null
+    }
+    const { type } = n2
+    if (isString(type)) {
+    // 没有旧节点的时候 认为要挂载
+      if (!n1)
+        mountElement(n2, container)
+      else
+        console.log('打补丁')
+    }
+    else if (isPlainObject(type)) {
+      console.info('组件')
+    }
+    else {
+      console.info('其他类型')
+    }
 
     // 打补丁
   }
 
   function mountElement(vnode, container) {
-    const el = createElement(vnode.type)
+    /**
+     * 为什么需要el和vnode建立联系 因为在后续的渲染中
+     * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是现在简单的innnerHtml = ''
+     */
+    const el = vnode.el = createElement(vnode.type)
 
     if (isString(vnode.children)) {
       setElementText(el, vnode.children)
@@ -77,6 +95,11 @@ export function createRenderer(options) {
 
     insert(el, container)
   }
+  function unmount(vnode) {
+    const parent = vnode.el.parentNode
+    if (parent)
+      parent.removeChild(vnode.el)
+  }
 
   function render(vnode, container) {
     // 当有要渲染的
@@ -86,7 +109,7 @@ export function createRenderer(options) {
     else {
       // 如果旧的存在 新的不存在 说明是卸载 直接置空
       if (container._vnode)
-        container.innerHTML = ''
+        unmount(container._vnode)
     }
     // 存储本次渲染的vnode
     container._vnode = vnode

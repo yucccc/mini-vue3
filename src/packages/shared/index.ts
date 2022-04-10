@@ -20,5 +20,5 @@ export const toRawType = (value: unknown): string => {
 export const isPlainObject = (val: unknown): val is object =>
   toTypeString(val) === '[object Object]'
 
-export function isString(val: unknown): val is String { return typeof val === 'string' }
+export const isString = (val: unknown): val is string => typeof val === 'string'
 export const isArray = Array.isArray
