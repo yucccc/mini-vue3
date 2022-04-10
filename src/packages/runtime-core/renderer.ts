@@ -25,13 +25,17 @@ export const nodeOptions = {
       // 采用的是伪造事件的方法 这样每次只需要更新invoker的value就行了
       if (nextValue) {
         if (!invoker) {
-          invoker = el._vei[key] = (e) => {
-            // 接受一个数组
+          invoker = el._vei[key] = (e: Event) => {
+            // 如果事件发生的时间要早于绑定的时间  那么不执行 阻止冒泡问题
+            if (e.timeStamp < invoker.attached) return
+            // 如果给同一个事件绑定了多个函数 那么依次执行
             if (isArray(invoker.value))
               invoker.value.forEach(fn => fn(e))
             else
               invoker.value(e)
           }
+          // 事件被绑定的时间 这里严格上是需要做下兼容 不过目前主流浏览器都是支持返回高精度时间
+          invoker.attached = performance.now()
           // 绑定到value上
           invoker.value = nextValue
           el.addEventListener(name, invoker)
