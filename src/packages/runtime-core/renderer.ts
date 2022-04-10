@@ -13,8 +13,42 @@ export const nodeOptions = {
   insert(el, parent: Document, anchor = null) {
     parent.insertBefore(el, anchor)
   },
-  patchProps(el, key, prevValue, nextValue) {
-    if (el === 'class') {
+  patchProp(el: Element, key: string, prevValue, nextValue) {
+    // 处理事件
+    if (/^on/.test(key)) {
+      const name = key.slice(2).toLowerCase()
+      // 元素伪造事件处理函数
+      const invokers = el._vei || (el._vei = {})
+      let invoker = invokers[key]
+      // 移除事件可以直接移除 但是性能不好
+      // prevValue && el.addEventListener(name, prevValue)
+      // 采用的是伪造事件的方法 这样每次只需要更新invoker的value就行了
+      if (nextValue) {
+        if (!invoker) {
+          invoker = el._vei[key] = (e) => {
+            // 接受一个数组
+            if (isArray(invoker.value))
+              invoker.value.forEach(fn => fn(e))
+            else
+              invoker.value(e)
+          }
+          // 绑定到value上
+          invoker.value = nextValue
+          el.addEventListener(name, invoker)
+        }
+        else {
+          // 更新
+          invoker.value = nextValue
+        }
+      }
+      else if (invoker) {
+      // 移除事件
+        el.removeEventListener(name, nextValue)
+      }
+    }
+    else if (key === 'class') {
+      // 可以选的是 setAttribute classList className
+      // className 性能最好
       el.className = nextValue || ''
     }
     // 用in判断key是否存在对应的dom properties
@@ -40,7 +74,7 @@ export const nodeOptions = {
  *
  */
 export function createRenderer(options) {
-  const { createElement, setElementText, insert, patchProps } = options
+  const { createElement, setElementText, insert, patchProp } = options
   /**
    * 打补丁 -> 更新
    * @param n1 旧节点
@@ -60,12 +94,15 @@ export function createRenderer(options) {
       if (!n1)
         mountElement(n2, container)
       else
+      // TODO: 未实现patch逻辑
         console.log('打补丁')
     }
     else if (isPlainObject(type)) {
+      // TODO: 未实现渲染子组件逻辑
       console.info('组件')
     }
     else {
+      // TODO: 未实现其他type类型逻辑
       console.info('其他类型')
     }
 
@@ -90,7 +127,7 @@ export function createRenderer(options) {
     // 设置props
     if (vnode.props) {
       for (const key in vnode.props)
-        patchProps(el, key, null, vnode.props[key])
+        patchProp(el, key, null, vnode.props[key])
     }
 
     insert(el, container)

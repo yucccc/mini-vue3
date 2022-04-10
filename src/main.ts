@@ -11,6 +11,9 @@ const vnode = {
   props: {
     id: 'foo',
     disabled: '',
+    onClick: () => {
+      console.log('click')
+    },
   },
   children: [
     { type: 'span', children: 'hello vue3' },
@@ -36,9 +39,9 @@ effect(() => {
 
 // setTimeout(() => { vnode.children = 'hello patch vue3 => vue4' }, 1000)
 
-setTimeout(() => {
-  obj.type = 'input'
-}, 1000)
+// setTimeout(() => {
+//   obj.type = 'input'
+// }, 1000)
 
 // setTimeout(() => {
 //   obj.ok = true
