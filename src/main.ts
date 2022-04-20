@@ -1,10 +1,10 @@
 import './style.css'
 import { effect } from './packages/reactivity/effect'
 import { reactive } from './packages/reactivity/reactive'
-import { createRenderer, nodeOptions } from './packages/runtime-core/renderer'
+import { createRenderer } from './packages/runtime-core/renderer'
 // const originalObj = { text: 'hello vue3', ok: true }
 
-const renderer = createRenderer(nodeOptions)
+const renderer = createRenderer()
 const vnode = {
   type: 'h1',
   // 使用props描述元素属性

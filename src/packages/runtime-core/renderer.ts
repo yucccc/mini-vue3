@@ -1,7 +1,9 @@
 import { isArray, isPlainObject, isString } from '../shared/index'
-
+import type { VNode } from './vnode'
 function shouldSetAsProps(el, key, value) {
-  if (key === 'form' && el.tagName === 'INPUT') return false
+  if (key === 'form' && el.tagName === 'INPUT') {
+    return false
+  }
   return key in el
 }
 // 平台方法
@@ -27,12 +29,10 @@ export const nodeOptions = {
         if (!invoker) {
           invoker = el._vei[key] = (e: Event) => {
             // 如果事件发生的时间要早于绑定的时间  那么不执行 阻止冒泡问题
-            if (e.timeStamp < invoker.attached) return
+            if (e.timeStamp < invoker.attached) { return }
             // 如果给同一个事件绑定了多个函数 那么依次执行
-            if (isArray(invoker.value))
-              invoker.value.forEach(fn => fn(e))
-            else
-              invoker.value(e)
+            if (isArray(invoker.value)) { invoker.value.forEach(fn => fn(e)) }
+            else { invoker.value(e) }
           }
           // 事件被绑定的时间 这里严格上是需要做下兼容 不过目前主流浏览器都是支持返回高精度时间
           invoker.attached = performance.now()
@@ -46,7 +46,7 @@ export const nodeOptions = {
         }
       }
       else if (invoker) {
-      // 移除事件
+        // 移除事件
         el.removeEventListener(name, nextValue)
       }
     }
@@ -59,11 +59,12 @@ export const nodeOptions = {
     else if (shouldSetAsProps(el, key, nextValue)) {
       const type = typeof el[key]
       // 用于 :disabled = false 或者disabled= ""
-      if (type === 'boolean' && nextValue === '')
+      if (type === 'boolean' && nextValue === '') {
         el[key] = true
-
-      else
+      }
+      else {
         el[key] = nextValue
+      }
     }
     else {
       el.setAttribute(key, nextValue)
@@ -77,7 +78,7 @@ export const nodeOptions = {
  * 渲染的过程叫做：挂载
  *
  */
-export function createRenderer(options) {
+export function createRenderer(options = nodeOptions) {
   const { createElement, setElementText, insert, patchProp } = options
   /**
    * 打补丁 -> 更新
@@ -86,7 +87,7 @@ export function createRenderer(options) {
    * @param container 挂载的容器
    */
   function patch(n1, n2, container) {
-    if (n1 === n2) return
+    if (n1 === n2) { return }
     // 如果新旧的类型都不同了 那么就没必要打补丁了
     if (n1 && n1.type !== n2.type) {
       unmount(n1)
@@ -94,12 +95,9 @@ export function createRenderer(options) {
     }
     const { type } = n2
     if (isString(type)) {
-    // 没有旧节点的时候 认为要挂载
-      if (!n1)
-        mountElement(n2, container)
-      else
-      // TODO: 未实现patch逻辑
-        console.log('打补丁')
+      // 没有旧节点的时候 全新的挂载
+      if (!n1) { mountElement(n2, container) }
+      else { patchElement(n1, n2) }
     }
     else if (isPlainObject(type)) {
       // TODO: 未实现渲染子组件逻辑
@@ -130,27 +128,31 @@ export function createRenderer(options) {
     }
     // 设置props
     if (vnode.props) {
-      for (const key in vnode.props)
-        patchProp(el, key, null, vnode.props[key])
+      for (const key in vnode.props) { patchProp(el, key, null, vnode.props[key]) }
     }
 
     insert(el, container)
   }
-  function unmount(vnode) {
-    const parent = vnode.el.parentNode
-    if (parent)
-      parent.removeChild(vnode.el)
+  function patchElement(n1, n2) {
+    console.log('更新')
   }
-
-  function render(vnode, container) {
+  function unmount(vnode: VNode) {
+    const parent = vnode.el!.parentNode
+    if (parent) { parent.removeChild(vnode.el) }
+  }
+  /**
+   * 将vnode渲染为真实dom
+   * @param vnode 要渲染的vnode
+   * @param container 挂载的容器
+   */
+  function render(vnode: VNode, container) {
     // 当有要渲染的
     if (vnode) {
       patch(container._vnode, vnode, container)
     }
     else {
       // 如果旧的存在 新的不存在 说明是卸载 直接置空
-      if (container._vnode)
-        unmount(container._vnode)
+      if (container._vnode) { unmount(container._vnode) }
     }
     // 存储本次渲染的vnode
     container._vnode = vnode

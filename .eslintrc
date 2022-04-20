@@ -1,3 +1,14 @@
 {
-    "extends": "@antfu"
+    "extends": "@antfu",
+    "rules": {
+        "no-console": "off",
+        "eol-last": "off",
+        "curly": [
+            "error",
+            "all"
+        ]
+    },
+    "env": {
+        "jest": true
+    }
 }
