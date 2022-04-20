@@ -86,7 +86,7 @@ export function createRenderer(options = nodeOptions) {
    * @param n2 新节点
    * @param container 挂载的容器
    */
-  function patch(n1, n2, container) {
+  function patch(n1: VNode | null, n2: VNode, container) {
     if (n1 === n2) { return }
     // 如果新旧的类型都不同了 那么就没必要打补丁了
     if (n1 && n1.type !== n2.type) {
@@ -96,8 +96,13 @@ export function createRenderer(options = nodeOptions) {
     const { type } = n2
     if (isString(type)) {
       // 没有旧节点的时候 全新的挂载
-      if (!n1) { mountElement(n2, container) }
-      else { patchElement(n1, n2) }
+      if (!n1) {
+        mountElement(n2, container)
+      }
+      // 有旧节点 那么可以对应出9种情况
+      else {
+        patchElement(n1, n2)
+      }
     }
     else if (isPlainObject(type)) {
       // TODO: 未实现渲染子组件逻辑
@@ -111,16 +116,17 @@ export function createRenderer(options = nodeOptions) {
     // 打补丁
   }
 
-  function mountElement(vnode, container) {
+  function mountElement(vnode: VNode, container) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
-     * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是现在简单的innnerHtml = ''
+     * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innnerHtml = ''
      */
     const el = vnode.el = createElement(vnode.type)
-
+    // 文本子节点
     if (isString(vnode.children)) {
       setElementText(el, vnode.children)
     }
+    // 如果是数组 那么循环调用patch流程
     else if (isArray(vnode.children)) {
       vnode.children.forEach((child) => {
         patch(null, child, el)
@@ -128,14 +134,77 @@ export function createRenderer(options = nodeOptions) {
     }
     // 设置props
     if (vnode.props) {
-      for (const key in vnode.props) { patchProp(el, key, null, vnode.props[key]) }
+      for (const key in vnode.props) {
+        patchProp(el, key, null, vnode.props[key])
+      }
     }
 
     insert(el, container)
   }
+  /**
+   * 更新元素
+   * @param n1
+   * @param n2
+   */
   function patchElement(n1, n2) {
-    console.log('更新')
+    const el = n2.el = n1.el
+    const oldProps = n1.props
+    const newProps = n2.props
+    for (const key in newProps) {
+      if (Object.prototype.hasOwnProperty.call(newProps, key)) {
+        // 如果新的值 不和旧的值一样 那么就更新props
+        if (newProps[key] !== oldProps[key]) {
+          patchProp(el, key, oldProps[key], newProps[key])
+        }
+      }
+    }
+    for (const key in oldProps) {
+      if (Object.prototype.hasOwnProperty.call(oldProps, key)) {
+        // 如果旧的值 没有在新的key中存在 那就置空
+        if (!(key in newProps)) {
+          patchProp(el, key, oldProps[key], null)
+        }
+      }
+    }
+    // 更新children
+    patchChildren(n1, n2, el)
   }
+
+  function patchChildren(n1, n2, container) {
+    // 新节点是文本
+    if (isString(n2.children)) {
+      // 旧节点有三种可能 文本 空节点 一组子节点
+      // 只有是一组子节点的时候 才需要处理 将旧的卸载
+      if (isArray(n1.children)) {
+        n1.children.forEach(unmount)
+      }
+      setElementText(container, n2.children)
+    }
+    // 新节点是一组子节点
+    else if (isArray(n2.children)) {
+      // 旧的也是一组 这里就涉及到diff算法
+      if (isArray(n1.children)) {
+        // 现在先直接将旧的全卸载掉 然后再挂载新的
+        n1.children.forEach(unmount)
+      }
+      else {
+        // 旧的是文本节点 直接置空即可
+        setElementText(container, '')
+      }
+      // 再将新的逐一挂载
+      n2.forEach(child => patch(null, child, container))
+    }
+    // 新的节点不存在
+    else {
+      if (isArray(n1.children)) {
+        n1.children.forEach(unmount)
+      }
+      else if (isString(n1.children)) {
+        setElementText(container, '')
+      }
+    }
+  }
+
   function unmount(vnode: VNode) {
     const parent = vnode.el!.parentNode
     if (parent) { parent.removeChild(vnode.el) }
@@ -152,7 +221,9 @@ export function createRenderer(options = nodeOptions) {
     }
     else {
       // 如果旧的存在 新的不存在 说明是卸载 直接置空
-      if (container._vnode) { unmount(container._vnode) }
+      if (container._vnode) {
+        unmount(container._vnode)
+      }
     }
     // 存储本次渲染的vnode
     container._vnode = vnode

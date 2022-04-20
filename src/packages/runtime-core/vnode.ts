@@ -6,11 +6,10 @@ export type VNodeTypes =
     | VNode
 
 export interface VNode {
-  __v_isVNode: true
-  __v_skip: true
   type: VNodeTypes
   props: Record<string, any> | null
   key: string | number | symbol | null
-  // DOM
+  // 引用的真实元素
   el: RendererNode | null
+  children: VNode[] | string | null
 }
