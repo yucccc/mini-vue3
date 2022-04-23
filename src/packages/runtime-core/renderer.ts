@@ -1,5 +1,6 @@
 import { isArray, isPlainObject, isString } from '../shared/index'
 import type { VNode } from './vnode'
+import { Comment, Fragment, Text } from './vnode'
 function shouldSetAsProps(el, key, value) {
   if (key === 'form' && el.tagName === 'INPUT') {
     return false
@@ -14,6 +15,14 @@ export const nodeOptions = {
   },
   insert(el, parent: Document, anchor = null) {
     parent.insertBefore(el, anchor)
+  },
+  // 创建文本节点
+  createText(text) {
+    return document.createTextNode(text)
+  },
+  // 设置文本节点
+  setText(el, text) {
+    el.nodeValue = text
   },
   patchProp(el: Element, key: string, prevValue, nextValue) {
     // 处理事件
@@ -79,7 +88,10 @@ export const nodeOptions = {
  *
  */
 export function createRenderer(options = nodeOptions) {
-  const { createElement, setElementText, insert, patchProp } = options
+  const {
+    createElement, setElementText,
+    insert, patchProp, createText, setText,
+  } = options
   /**
    * 打补丁 -> 更新
    * @param n1 旧节点
@@ -93,7 +105,9 @@ export function createRenderer(options = nodeOptions) {
       unmount(n1)
       n1 = null
     }
+    // 往下走的type都是相同的了
     const { type } = n2
+    // 是标签节点
     if (isString(type)) {
       // 没有旧节点的时候 全新的挂载
       if (!n1) {
@@ -102,6 +116,33 @@ export function createRenderer(options = nodeOptions) {
       // 有旧节点 那么可以对应出9种情况
       else {
         patchElement(n1, n2)
+      }
+    }
+    // 文本节点
+    else if (type === Text) {
+      // 如果没有旧节点 则进行挂载
+      if (n1 == null) {
+        const el = n2.el = createText(n2.children)
+        insert(el, container)
+      }
+      else {
+        // 如果旧vnode存在 只需要使用新文本节点的文本内容更新旧的文本内容即可
+        const el = n2.el = n1.el
+        if (n2.children !== n1.children) {
+          setText(el, n2.children)
+        }
+      }
+    }
+    else if (type === Comment) {
+    }
+    // 片段 渲染子节点
+    else if (type === Fragment) {
+      // 没有旧节点的时候 全新的挂载
+      if (n1 == null) {
+        n2.children(child => patch(null, child, container))
+      }
+      else {
+        patchChildren(n1.children, n2.children, container)
       }
     }
     else if (isPlainObject(type)) {
@@ -206,6 +247,10 @@ export function createRenderer(options = nodeOptions) {
   }
 
   function unmount(vnode: VNode) {
+    // 如果是片段 卸载的时候需要卸载子层
+    if (vnode.type === Fragment) {
+      return vnode.children.forEach(unmount)
+    }
     const parent = vnode.el!.parentNode
     if (parent) { parent.removeChild(vnode.el) }
   }
