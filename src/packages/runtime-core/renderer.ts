@@ -85,7 +85,6 @@ export const nodeOptions = {
  * 创建一个渲染器
  * 渲染器的作用：把虚拟dom渲染为特定平台上的真实元素
  * 渲染的过程叫做：挂载
- *
  */
 export function createRenderer(options = nodeOptions) {
   const {
@@ -98,7 +97,8 @@ export function createRenderer(options = nodeOptions) {
    * @param n2 新节点
    * @param container 挂载的容器
    */
-  function patch(n1: VNode | null, n2: VNode, container) {
+  function patch(n1: VNode | null, n2: VNode, container: Element) {
+    // 两个都全等了 没必要打补丁
     if (n1 === n2) { return }
     // 如果新旧的类型都不同了 那么就没必要打补丁了
     if (n1 && n1.type !== n2.type) {
@@ -157,7 +157,7 @@ export function createRenderer(options = nodeOptions) {
     // 打补丁
   }
 
-  function mountElement(vnode: VNode, container) {
+  function mountElement(vnode: VNode, container: Element) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
      * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innnerHtml = ''
@@ -188,6 +188,7 @@ export function createRenderer(options = nodeOptions) {
    * @param n2
    */
   function patchElement(n1, n2) {
+    // 将旧的dom引用到到新的虚拟dom上
     const el = n2.el = n1.el
     const oldProps = n1.props
     const newProps = n2.props
@@ -221,19 +222,39 @@ export function createRenderer(options = nodeOptions) {
       }
       setElementText(container, n2.children)
     }
-    // 新节点是一组子节点
     else if (isArray(n2.children)) {
-      // 旧的也是一组 这里就涉及到diff算法
+      // 当新旧节点都是一组数据时 就涉及到核心diff算法
       if (isArray(n1.children)) {
-        // 现在先直接将旧的全卸载掉 然后再挂载新的
-        n1.children.forEach(unmount)
+        // 旧的也是一组
+        const oldChildren = n1.children
+        const newChildren = n2.children
+        const oldLen = oldChildren.length
+        const newLen = newChildren.length
+
+        const commonLen = Math.min(oldLen, newLen)
+        // 更新节点
+        for (let index = 0; index < commonLen; index++) {
+          patch(oldChildren[index], newChildren[index], container)
+        }
+        // 新的大 那就是新增
+        if (newLen > oldLen) {
+          for (let i = commonLen; i < newLen; i++) {
+            patch(null, newChildren[i], container)
+          }
+        }
+        // 旧的大 那就是删除
+        else if (oldLen > newLen) {
+          for (let i = commonLen; i < oldLen; i++) {
+            unmount(oldChildren[i])
+          }
+        }
       }
       else {
-        // 旧的是文本节点 直接置空即可
+        // 不是数组 那就是文本了 置空
         setElementText(container, '')
+        // 然后再挂载
+        n2.children.forEach(c => patch(null, c, container))
       }
-      // 再将新的逐一挂载
-      n2.forEach(child => patch(null, child, container))
     }
     // 新的节点不存在
     else {

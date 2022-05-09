@@ -27,8 +27,7 @@ function createArrayInstrumentation() {
       // this 是代理对象 先在代理对象中查找
       const res = originMethod.apply(this, args)
       // 没找到
-      if (res === -1 || res === false)
-        return originMethod.apply(this.raw, args)
+      if (res === -1 || res === false) { return originMethod.apply(this.raw, args) }
 
       return res
     }
@@ -61,8 +60,7 @@ function createReactiveObject<T extends object>(
   // target already has corresponding Proxy
   const existingProxy = proxyMap.get(target)
 
-  if (existingProxy)
-    return existingProxy
+  if (existingProxy) { return existingProxy }
 
   const proxy = new Proxy(
     target,
@@ -70,23 +68,20 @@ function createReactiveObject<T extends object>(
       // 读取的时候 需要将副作用加入桶子里面
       get(target, key, receiver) {
         // const targetIsArray = isArray(target)
-        if (key === 'raw') return target
+        if (key === 'raw') { return target }
         // 非只读才建立联系
-        if (!isReadOnly)
-          track(target, key)
+        if (!isReadOnly) { track(target, key) }
 
-        if (isArray(target) && Object.prototype.hasOwnProperty.call(arrayInstrumentation, key))
-          return Reflect.get(arrayInstrumentation, key, receiver)
+        if (isArray(target) && Object.prototype.hasOwnProperty.call(arrayInstrumentation, key)) { return Reflect.get(arrayInstrumentation, key, receiver) }
 
         const res = Reflect.get(target, key, receiver)
 
-        if (isShallow)
-          return res
+        if (isShallow) { return res }
 
         // 如果是对象的是 需要递归代理为响应式
         if (isObject(res))
         // 处理深只读和深响应
-          return isReadOnly ? readonly(res) : reactive(res)
+        { return isReadOnly ? readonly(res) : reactive(res) }
 
         return res
       },
@@ -129,8 +124,7 @@ function createReactiveObject<T extends object>(
 
         const result = Reflect.deleteProperty(target, key)
         // 真的有被删除成功再触发通知
-        if (result)
-          trigger(target, key, TriggerOpTypes.DELETE)
+        if (result) { trigger(target, key, TriggerOpTypes.DELETE) }
         return result
       },
       // 见文档 https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy/Proxy/ownKeys

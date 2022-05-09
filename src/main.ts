@@ -5,48 +5,40 @@ import { createRenderer } from './packages/runtime-core/renderer'
 // const originalObj = { text: 'hello vue3', ok: true }
 
 const renderer = createRenderer()
-const vnode = {
-  type: 'h1',
-  // 使用props描述元素属性
-  props: {
-    id: 'foo',
-    disabled: '',
-    onClick: () => {
-      console.log('click')
-    },
-  },
+// const vnode = {
+//   type: 'h1',
+//   // 使用props描述元素属性
+//   props: {
+//     id: 'foo',
+//     disabled: '',
+//     onClick: () => {
+//       console.log('click')
+//     },
+//   },
+//   children: [
+//     { type: 'span', children: 'hello vue3' },
+//     { type: 'input', props: { form: 'input form' } },
+//   ],
+// }
+const oldVnodeEsayDiff = {
+  type: 'div',
   children: [
-    { type: 'span', children: 'hello vue3' },
-    { type: 'input', props: { form: 'input form' } },
+    { type: 'p', children: '1', key: '1' },
+    { type: 'p', children: '2', key: '2' },
+    { type: 'p', children: '3', key: '3' },
+  ],
+}
+const newVnodeEsayDiff = {
+  type: 'div',
+  children: [
+    { type: 'div', children: '4', key: '3' },
+    { type: 'p', children: '5', key: '2' },
+    { type: 'p', children: '6', key: '1' },
   ],
 }
 
-const vnode2 = {
-  type: {},
-  // 使用props描述元素属性
-  props: { form: 'input form' },
-}
+renderer.render(oldVnodeEsayDiff, document.querySelector('#app'))
 
-const obj = reactive(vnode)
-const obj2 = reactive(vnode2)
-
-effect(() => {
-  // 执行的时候响应式对象会被收集 等再次更新的时候 副作用函数会被再次执行
-  // document.body.innerText = obj.ok ? obj.text : 'not'
-  renderer.render(obj, document.querySelector('#app'))
-  // renderer.render(obj2, document.querySelector('#app'))
-})
-
-// setTimeout(() => { vnode.children = 'hello patch vue3 => vue4' }, 1000)
-
-// setTimeout(() => {
-//   obj.type = 'input'
-// }, 1000)
-
-// setTimeout(() => {
-//   obj.ok = true
-// }, 2000)
-
-// setTimeout(() => {
-//   obj.ok = false
-// }, 3000)
+setTimeout(() => {
+  renderer.render(newVnodeEsayDiff, document.querySelector('#app'))
+}, 2000)
