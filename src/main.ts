@@ -31,9 +31,10 @@ const oldVnodeEsayDiff = {
 const newVnodeEsayDiff = {
   type: 'div',
   children: [
+    { type: 'p', children: '新增的节点', key: '5' },
     { type: 'div', children: '4', key: '3' },
-    { type: 'p', children: '5', key: '2' },
-    { type: 'p', children: '6', key: '1' },
+    { type: 'p', children: '5', key: '6' }, // 1被删除
+    { type: 'p', children: '6', key: '2' },
   ],
 }
 

@@ -9,11 +9,11 @@ function shouldSetAsProps(el, key, value) {
 }
 // 平台方法
 export const nodeOptions = {
-  createElement: tag => document.createElement(tag),
+  createElement: (tag: string): Element => document.createElement(tag),
   setElementText(el, text) {
     el.textContent = text
   },
-  insert(el, parent: Document, anchor = null) {
+  insert(el: HTMLElement, parent: Document, anchor = null) {
     parent.insertBefore(el, anchor)
   },
   // 创建文本节点
@@ -134,6 +134,7 @@ export function createRenderer(options = nodeOptions) {
       }
     }
     else if (type === Comment) {
+      console.info('注释')
     }
     // 片段 渲染子节点
     else if (type === Fragment) {
@@ -160,7 +161,7 @@ export function createRenderer(options = nodeOptions) {
   function mountElement(vnode: VNode, container: Element) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
-     * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innnerHtml = ''
+     * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innerHtml = ''
      */
     const el = vnode.el = createElement(vnode.type)
     // 文本子节点
@@ -228,24 +229,58 @@ export function createRenderer(options = nodeOptions) {
         // 旧的也是一组
         const oldChildren = n1.children
         const newChildren = n2.children
-        const oldLen = oldChildren.length
-        const newLen = newChildren.length
-
-        const commonLen = Math.min(oldLen, newLen)
-        // 更新节点
-        for (let index = 0; index < commonLen; index++) {
-          patch(oldChildren[index], newChildren[index], container)
-        }
-        // 新的大 那就是新增
-        if (newLen > oldLen) {
-          for (let i = commonLen; i < newLen; i++) {
-            patch(null, newChildren[i], container)
+        /**
+         * 这样做的缺点是 类型不同的是也被卸载掉
+         */
+        // const oldLen = oldChildren.length
+        // const newLen = newChildren.length
+        // const commonLen = Math.min(oldLen, newLen)
+        // // 更新节点
+        // for (let index = 0; index < commonLen; index++) {
+        //   patch(oldChildren[index], newChildren[index], container)
+        // }
+        // // 新的大 那就是新增
+        // if (newLen > oldLen) {
+        //   for (let i = commonLen; i < newLen; i++) {
+        //     patch(null, newChildren[i], container)
+        //   }
+        // }
+        // // 旧的大 那就是删除
+        // else if (oldLen > newLen) {
+        //   for (let i = commonLen; i < oldLen; i++) {
+        //     unmount(oldChildren[i])
+        //   }
+        // }
+        let lastIndex = 0
+        for (let i = 0; i < newChildren.length; i++) {
+          const newVNode = newChildren[i]
+          let find = false
+          for (let j = 0; j < oldChildren.length; j++) {
+            const oldVNode = oldChildren[j]
+            // 判断key一样 type
+            if (oldVNode.key === newVNode.key) {
+              find = true
+              patch(oldVNode, newVNode, container)
+              if (j < lastIndex) {
+                insert(newVNode.el, container)
+              }
+              else {
+                lastIndex = j
+              }
+              break
+            }
+          }
+          // 子元素都找不到可复用的节点 那么认为当前是新增的节点
+          if (!find) {
+            patch(null, newVNode, container)
           }
         }
-        // 旧的大 那就是删除
-        else if (oldLen > newLen) {
-          for (let i = commonLen; i < oldLen; i++) {
-            unmount(oldChildren[i])
+        // 处理旧节点被删除情况
+        for (let index = 0; index < oldChildren.length; index++) {
+          const oldVNode = oldChildren[index]
+          const has = newChildren.find(vnode => vnode.key === oldVNode.key)
+          if (!has) {
+            unmount(oldVNode)
           }
         }
       }
