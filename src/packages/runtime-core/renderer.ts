@@ -13,8 +13,14 @@ export const nodeOptions = {
   setElementText(el, text) {
     el.textContent = text
   },
-  insert(el: HTMLElement, parent: Document, anchor = null) {
-    parent.insertBefore(el, anchor)
+  /**
+   * 插入节点
+   * @param el 要插入的节点
+   * @param parent 父节点
+   * @param referenceNode 如果传递了该参数 则插入位置为el前面 否则为父节点下的子节点末尾
+   */
+  insert(el: HTMLElement, parent: Document, referenceNode = null) {
+    parent.insertBefore(el, referenceNode)
   },
   // 创建文本节点
   createText(text) {
@@ -227,8 +233,8 @@ export function createRenderer(options = nodeOptions) {
       // 当新旧节点都是一组数据时 就涉及到核心diff算法
       if (isArray(n1.children)) {
         // 旧的也是一组
-        const oldChildren = n1.children
-        const newChildren = n2.children
+        // const oldChildren = n1.children
+        // const newChildren = n2.children
         /**
          * 这样做的缺点是 类型不同的是也被卸载掉
          */
@@ -251,38 +257,42 @@ export function createRenderer(options = nodeOptions) {
         //     unmount(oldChildren[i])
         //   }
         // }
-        let lastIndex = 0
-        for (let i = 0; i < newChildren.length; i++) {
-          const newVNode = newChildren[i]
-          let find = false
-          for (let j = 0; j < oldChildren.length; j++) {
-            const oldVNode = oldChildren[j]
-            // 判断key一样 type
-            if (oldVNode.key === newVNode.key) {
-              find = true
-              patch(oldVNode, newVNode, container)
-              if (j < lastIndex) {
-                insert(newVNode.el, container)
-              }
-              else {
-                lastIndex = j
-              }
-              break
-            }
-          }
-          // 子元素都找不到可复用的节点 那么认为当前是新增的节点
-          if (!find) {
-            patch(null, newVNode, container)
-          }
-        }
-        // 处理旧节点被删除情况
-        for (let index = 0; index < oldChildren.length; index++) {
-          const oldVNode = oldChildren[index]
-          const has = newChildren.find(vnode => vnode.key === oldVNode.key)
-          if (!has) {
-            unmount(oldVNode)
-          }
-        }
+        /**
+         * 简单diff算法
+         */
+        // let lastIndex = 0
+        // for (let i = 0; i < newChildren.length; i++) {
+        //   const newVNode = newChildren[i]
+        //   let find = false
+        //   for (let j = 0; j < oldChildren.length; j++) {
+        //     const oldVNode = oldChildren[j]
+        //     // 判断key一样 type
+        //     if (oldVNode.key === newVNode.key) {
+        //       find = true
+        //       patch(oldVNode, newVNode, container)
+        //       if (j < lastIndex) {
+        //         insert(newVNode.el, container)
+        //       }
+        //       else {
+        //         lastIndex = j
+        //       }
+        //       break
+        //     }
+        //   }
+        //   // 子元素都找不到可复用的节点 那么认为当前是新增的节点
+        //   if (!find) {
+        //     patch(null, newVNode, container)
+        //   }
+        // }
+        // // 处理旧节点被删除情况
+        // for (let index = 0; index < oldChildren.length; index++) {
+        //   const oldVNode = oldChildren[index]
+        //   const has = newChildren.find(vnode => vnode.key === oldVNode.key)
+        //   if (!has) {
+        //     unmount(oldVNode)
+        //   }
+        // }
+        patchKeyedChildren(n1, n2, container)
       }
       else {
         // 不是数组 那就是文本了 置空
@@ -301,7 +311,57 @@ export function createRenderer(options = nodeOptions) {
       }
     }
   }
+  function patchKeyedChildren(n1, n2, container) {
+    const oldChildren = n1.children
+    const newChildren = n2.children
+    // 旧的点
+    let oldStartIndex = 0
+    let oldEndIndex = oldChildren.length - 1
+    // 新的点
+    let newStartIndex = 0
+    let newEndIndex = newChildren.length - 1
+    // 对应的vnode
+    let oldStartVNode = oldChildren[oldStartIndex]
+    let oldEndVNode = oldChildren[oldEndIndex]
 
+    // 对应的新的vnode
+    let newStartVNode = newChildren[newStartIndex]
+    let newEndVNode = newChildren[newEndIndex]
+    while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
+    // 旧的最后一个等于新的第一个 旧尾新头
+      if (oldEndVNode.key === newStartVNode.key) {
+        patch(oldEndVNode, newStartVNode, container)
+        // 移动dom
+        insert(oldEndVNode.el, container, oldStartVNode.el)
+        oldEndVNode = oldChildren[--oldEndIndex]
+        newStartVNode = newChildren[++newStartIndex]
+      }
+      // 旧节点的头和新节点的尾相同 旧头新尾
+      else if (oldStartVNode.key === newEndVNode.key) {
+        patch(oldEndVNode, newStartVNode, container)
+        // 移动dom
+        insert(oldStartVNode.el, container, newEndVNode.el)
+        oldStartVNode = oldChildren[++oldStartIndex]
+        newEndVNode = newChildren[--newEndIndex]
+      }
+      //  尾和尾相同
+      else if (oldEndVNode.key === newEndVNode.key) {
+        patch(oldEndVNode, newStartVNode, container)
+        oldEndVNode = oldChildren[--oldEndIndex]
+        newEndVNode = newChildren[--newEndIndex]
+      }
+      // 头和头相同
+      else if (oldStartVNode.key === newStartVNode.key) {
+        patch(oldEndVNode, newStartVNode, container)
+        oldStartVNode = oldChildren[++oldStartIndex]
+        newStartVNode = newChildren[--newStartIndex]
+      }
+
+      else {
+        console.log('多余了')
+      }
+    }
+  }
   function unmount(vnode: VNode) {
     // 如果是片段 卸载的时候需要卸载子层
     if (vnode.type === Fragment) {

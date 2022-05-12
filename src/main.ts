@@ -23,18 +23,19 @@ const renderer = createRenderer()
 const oldVnodeEsayDiff = {
   type: 'div',
   children: [
-    { type: 'p', children: '1', key: '1' },
+    { type: 'p', children: '1', key: '4' },
     { type: 'p', children: '2', key: '2' },
+    { type: 'p', children: '3', key: '1' },
     { type: 'p', children: '3', key: '3' },
   ],
 }
 const newVnodeEsayDiff = {
   type: 'div',
   children: [
-    { type: 'p', children: '新增的节点', key: '5' },
-    { type: 'div', children: '4', key: '3' },
-    { type: 'p', children: '5', key: '6' }, // 1被删除
-    { type: 'p', children: '6', key: '2' },
+    { type: 'p', children: '4', key: '1' },
+    { type: 'p', children: '5', key: '2' }, // 1被删除
+    { type: 'p', children: '6', key: '3' },
+    { type: 'p', children: '6', key: '4' },
   ],
 }
 

@@ -76,12 +76,14 @@ function createReactiveObject<T extends object>(
 
         const res = Reflect.get(target, key, receiver)
 
-        if (isShallow) { return res }
+        if (isShallow) {
+          return res
+        }
 
-        // 如果是对象的是 需要递归代理为响应式
-        if (isObject(res))
-        // 处理深只读和深响应
-        { return isReadOnly ? readonly(res) : reactive(res) }
+        // 如果是对象的是 需要递归代理为响应式 // 处理深只读和深响应
+        if (isObject(res)) {
+          return isReadOnly ? readonly(res) : reactive(res)
+        }
 
         return res
       },
