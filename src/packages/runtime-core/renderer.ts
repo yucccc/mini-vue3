@@ -103,7 +103,7 @@ export function createRenderer(options = nodeOptions) {
    * @param n2 新节点
    * @param container 挂载的容器
    */
-  function patch(n1: VNode | null, n2: VNode, container: Element) {
+  function patch(n1: VNode | null, n2: VNode, container: Element, referenceNode?: Element) {
     // 两个都全等了 没必要打补丁
     if (n1 === n2) { return }
     // 如果新旧的类型都不同了 那么就没必要打补丁了
@@ -117,7 +117,7 @@ export function createRenderer(options = nodeOptions) {
     if (isString(type)) {
       // 没有旧节点的时候 全新的挂载
       if (!n1) {
-        mountElement(n2, container)
+        mountElement(n2, container, referenceNode)
       }
       // 有旧节点 那么可以对应出9种情况
       else {
@@ -129,7 +129,7 @@ export function createRenderer(options = nodeOptions) {
       // 如果没有旧节点 则进行挂载
       if (n1 == null) {
         const el = n2.el = createText(n2.children)
-        insert(el, container)
+        insert(el, container, referenceNode)
       }
       else {
         // 如果旧vnode存在 只需要使用新文本节点的文本内容更新旧的文本内容即可
@@ -164,7 +164,7 @@ export function createRenderer(options = nodeOptions) {
     // 打补丁
   }
 
-  function mountElement(vnode: VNode, container: Element) {
+  function mountElement(vnode: VNode, container: Element, referenceNode) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
      * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innerHtml = ''
@@ -187,7 +187,7 @@ export function createRenderer(options = nodeOptions) {
       }
     }
 
-    insert(el, container)
+    insert(el, container, referenceNode)
   }
   /**
    * 更新元素
@@ -372,9 +372,27 @@ export function createRenderer(options = nodeOptions) {
           patch(vnodeToMove, newStartVNode, container)
           insert(vnodeToMove.el, container, oldStartVNode.el)
           oldChildren[indexInOld] = undefined
-          // 更新newstart的位置
-          newStartVNode = newChildren[++newStartIndex]
         }
+        else {
+          // 说明是全新的新节点
+          patch(null, newStartVNode, container, oldStartVNode.el)
+        }
+        // 更新newstart的位置
+        newStartVNode = newChildren[++newStartIndex]
+      }
+    }
+    // 循环完毕 检查是否有遗漏
+
+    // 新增节点 存在新节点未被处理
+    if (oldStartIndex < oldEndIndex && newStartIndex <= newEndIndex) {
+      for (let index = newStartIndex; index < newEndIndex; index++) {
+        patch(null, newChildren[index], container, oldStartVNode.el)
+      }
+    }
+    // 被卸载的节点
+    else if (oldStartIndex <= oldEndIndex && newStartIndex > newEndIndex) {
+      for (let index = oldStartIndex; index <= oldEndIndex; index++) {
+        unmount(oldChildren[index])
       }
     }
   }
