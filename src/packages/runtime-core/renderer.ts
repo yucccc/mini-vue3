@@ -328,8 +328,15 @@ export function createRenderer(options = nodeOptions) {
     let newStartVNode = newChildren[newStartIndex]
     let newEndVNode = newChildren[newEndIndex]
     while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
-    // 旧的最后一个等于新的第一个 旧尾新头
-      if (oldEndVNode.key === newStartVNode.key) {
+      // 为空时 直接往下移动指针
+      if (!oldStartVNode) {
+        oldStartVNode = oldChildren[++oldStartVNode]
+      }
+      else if (!oldEndVNode) {
+        oldEndVNode = oldChildren[--oldEndIndex]
+      }
+      // 旧的最后一个等于新的第一个 旧尾新头
+      else if (oldEndVNode.key === newStartVNode.key) {
         patch(oldEndVNode, newStartVNode, container)
         // 移动dom
         insert(oldEndVNode.el, container, oldStartVNode.el)
@@ -358,7 +365,16 @@ export function createRenderer(options = nodeOptions) {
       }
 
       else {
-        console.log('多余了')
+        const indexInOld = oldChildren.findIndex(vnode => vnode.key === newStartVNode.key)
+        // 其实大于等于0都可以 但是不会等于0 因为等于0就是头和头相等 会提前走前面的逻辑
+        if (indexInOld > 0) {
+          const vnodeToMove = oldChildren[indexInOld]
+          patch(vnodeToMove, newStartVNode, container)
+          insert(vnodeToMove.el, container, oldStartVNode.el)
+          oldChildren[indexInOld] = undefined
+          // 更新newstart的位置
+          newStartVNode = newChildren[++newStartIndex]
+        }
       }
     }
   }
