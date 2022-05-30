@@ -68,8 +68,7 @@ export function effect<T = any>(fn: () => T, options: ReactiveEffectOptions = {}
   effectFn.options = options
 
   // 目前用于computed 一开始不立刻执行
-  if (!options.lazy)
-    effectFn()
+  if (!options.lazy) { effectFn() }
 
   return effectFn
 }
@@ -90,18 +89,20 @@ export const enum TriggerOpTypes {
   CLEAR = 'clear',
 }
 export function track(target, key) {
-  if (!activeEffect || !shouldTrack) return
+  if (!activeEffect || !shouldTrack) { return }
 
   let depsMap = bucket.get(target)
 
   // 如果不存在depsMap
-  if (!depsMap)
+  if (!depsMap) {
     bucket.set(target, (depsMap = new Map()))
+  }
 
   let deps = depsMap.get(key)
 
-  if (!deps)
+  if (!deps) {
     depsMap.set(key, (deps = new Set()))
+  }
 
   deps.add(activeEffect)
   // deps
@@ -118,7 +119,7 @@ export function trigger(
   oldValue?: unknown,
 ) {
   const depsMap = bucket.get(target)
-  if (!depsMap) return
+  if (!depsMap) { return }
 
   const effects = depsMap.get(key)
 
@@ -126,8 +127,7 @@ export function trigger(
 
   // TODO 一旦判断是否等于activeEffect就有问题 待查看
   effects && effects.forEach((effectFn) => {
-    if (effectFn !== activeEffect)
-      effectsToRun.add(effectFn)
+    if (effectFn !== activeEffect) { effectsToRun.add(effectFn) }
   })
   // 新增或者减少都会导致for循环的次数变更 所以需要重新执行
   if (type === TriggerOpTypes.ADD || type === TriggerOpTypes.DELETE) {
@@ -145,8 +145,7 @@ export function trigger(
       if (typeof key !== 'symbol') { // 这个symbol后期需要优化判断
         if (key >= (newValue as number)) {
           effects.forEach((effectFn) => {
-            if (effectFn !== activeEffect)
-              effectsToRun.add(effectFn)
+            if (effectFn !== activeEffect) { effectsToRun.add(effectFn) }
           })
         }
       }
@@ -154,18 +153,15 @@ export function trigger(
   }
 
   effectsToRun.forEach((effectFn) => {
-    if (effectFn.options.scheduler)
-      effectFn.options.scheduler()
-    else
-      effectFn()
+    if (effectFn.options.scheduler) { effectFn.options.scheduler() }
+    else { effectFn() }
   })
 }
 
 export function cleanupEffect(effect) {
   const { deps } = effect
   if (deps.length) {
-    for (let i = 0; i < deps.length; i++)
-      deps[i].delete(effect)
+    for (let i = 0; i < deps.length; i++) { deps[i].delete(effect) }
     deps.length = 0
   }
 }

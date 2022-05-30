@@ -103,7 +103,7 @@ export function createRenderer(options = nodeOptions) {
    * @param n2 新节点
    * @param container 挂载的容器
    */
-  function patch(n1: VNode | null, n2: VNode, container: Element, referenceNode?: Element) {
+  function patch(n1: VNode | null, n2: VNode, container: Element, referenceNode: (Element | null) = null) {
     // 两个都全等了 没必要打补丁
     if (n1 === n2) { return }
     // 如果新旧的类型都不同了 那么就没必要打补丁了
@@ -160,8 +160,6 @@ export function createRenderer(options = nodeOptions) {
       // TODO: 未实现其他type类型逻辑
       console.info('其他类型')
     }
-
-    // 打补丁
   }
 
   function mountElement(vnode: VNode, container: Element, referenceNode) {
@@ -314,85 +312,98 @@ export function createRenderer(options = nodeOptions) {
   function patchKeyedChildren(n1, n2, container) {
     const oldChildren = n1.children
     const newChildren = n2.children
-    // 旧的点
-    let oldStartIndex = 0
-    let oldEndIndex = oldChildren.length - 1
-    // 新的点
-    let newStartIndex = 0
-    let newEndIndex = newChildren.length - 1
-    // 对应的vnode
-    let oldStartVNode = oldChildren[oldStartIndex]
-    let oldEndVNode = oldChildren[oldEndIndex]
+    // 处理相同的开始
+    let j = 0
+    let oldVNode = oldChildren[j]
+    let newVNode = newChildren[j]
+    // 1、向后循环 把前置相同的处理了
+    // (a b) c
+    // (a b) d e
+    while (oldVNode.key === newVNode.key) {
+      patch(oldVNode, newVNode, container)
+      j++
+      oldVNode = oldChildren[j]
+      newVNode = newChildren[j]
+    }
 
-    // 对应的新的vnode
-    let newStartVNode = newChildren[newStartIndex]
-    let newEndVNode = newChildren[newEndIndex]
-    while (oldStartIndex <= oldEndIndex && newStartIndex <= newEndIndex) {
-      // 为空时 直接往下移动指针
-      if (!oldStartVNode) {
-        oldStartVNode = oldChildren[++oldStartVNode]
-      }
-      else if (!oldEndVNode) {
-        oldEndVNode = oldChildren[--oldEndIndex]
-      }
-      // 旧的最后一个等于新的第一个 旧尾新头
-      else if (oldEndVNode.key === newStartVNode.key) {
-        patch(oldEndVNode, newStartVNode, container)
-        // 移动dom
-        insert(oldEndVNode.el, container, oldStartVNode.el)
-        oldEndVNode = oldChildren[--oldEndIndex]
-        newStartVNode = newChildren[++newStartIndex]
-      }
-      // 旧节点的头和新节点的尾相同 旧头新尾
-      else if (oldStartVNode.key === newEndVNode.key) {
-        patch(oldEndVNode, newStartVNode, container)
-        // 移动dom
-        insert(oldStartVNode.el, container, newEndVNode.el)
-        oldStartVNode = oldChildren[++oldStartIndex]
-        newEndVNode = newChildren[--newEndIndex]
-      }
-      //  尾和尾相同
-      else if (oldEndVNode.key === newEndVNode.key) {
-        patch(oldEndVNode, newStartVNode, container)
-        oldEndVNode = oldChildren[--oldEndIndex]
-        newEndVNode = newChildren[--newEndIndex]
-      }
-      // 头和头相同
-      else if (oldStartVNode.key === newStartVNode.key) {
-        patch(oldEndVNode, newStartVNode, container)
-        oldStartVNode = oldChildren[++oldStartIndex]
-        newStartVNode = newChildren[--newStartIndex]
-      }
+    // 2、把后面相同的处理了
+    // 新旧的索引
+    let oldEnd = oldChildren.length - 1
+    let newEnd = newChildren.length - 1
+    oldVNode = oldChildren[oldEnd]
+    newVNode = newChildren[newEnd]
+    while (oldVNode.key === newVNode.key) {
+      patch(oldVNode, newVNode, container)
+      // 递减 往前更新
+      oldVNode = oldChildren[--oldEnd]
+      newVNode = newChildren[--newEnd]
+    }
 
-      else {
-        const indexInOld = oldChildren.findIndex(vnode => vnode.key === newStartVNode.key)
-        // 其实大于等于0都可以 但是不会等于0 因为等于0就是头和头相等 会提前走前面的逻辑
-        if (indexInOld > 0) {
-          const vnodeToMove = oldChildren[indexInOld]
-          patch(vnodeToMove, newStartVNode, container)
-          insert(vnodeToMove.el, container, oldStartVNode.el)
-          oldChildren[indexInOld] = undefined
+    // 3、处理新增节点的情况
+    // j > oldEnd 说明旧节点已经处理没了
+    // j <= newEnd 说明新节点还有没处理完的
+    if (j <= newEnd && j > oldEnd) {
+      // 找到锚点位置 为什么要加1 也就是下一个节点 要插入的位置
+      const anchorIndex = newEnd + 1
+      // 如果anchorIndex小于数组长度  说明锚点在新的一组子节点中 否则就认为newEnd已经是尾部节点了
+      const anchor = anchorIndex < newChildren.length ? newChildren[anchorIndex].el : null
+      while (j <= newEnd) {
+        patch(null, newChildren[j++], container, anchor)
+      }
+    }
+    else if (j > newEnd && j <= oldEnd) {
+      while (j <= oldEnd) {
+        unmount(oldChildren[j++])
+      }
+    }
+    else {
+      // 进行最长递增子序列
+      // 1、创建一个数组填充为-1
+      const count = newEnd - j + 1
+      const source = new Array(count).fill(-1) // [-1, -1, -1, -1]
+      const oldStart = j
+      const newStart = j
+      // 用于填充新节点在旧节点上的索引位置 复杂度太高了
+      // for (let index = oldStart; index <= oldEnd; index++) {
+      //   const oldVNode = oldChildren[index]
+      //   for (let k = newStart; k <= newEnd; k++) {
+      //     const newVNode = newChildren[k]
+      //     // 找到可复用的元素
+      //     if (oldVNode.key === newChildren.key) {
+      //       patch(oldVNode, newVNode, container)
+      //       source[k - newStart] = index
+      //     }
+      //   }
+      // }
+      let moved = false
+      let pos = 0
+      let pathced = 0
+      const keyIndex: Record<any, number> = {}
+      for (let index = oldStart; index <= oldEnd; index++) {
+        const oldVNode = oldChildren[index]
+        keyIndex[oldVNode.key] = index
+      }
+      // 遍历旧节点剩余的未处理的节点
+      for (let index = oldStart; index <= oldEnd; index++) {
+        const oldVNode = oldChildren[index]
+        const k = keyIndex[oldVNode.key]
+        if (typeof k !== 'undefined') {
+          newVNode = newChildren[k]
+          pathced++
+          patch(oldVNode, newVNode, container)
+          // 数组
+          source[k - newStart] = index
+          if (k < pos) {
+            moved = true
+          }
+          else {
+            pos = k
+          }
         }
         else {
-          // 说明是全新的新节点
-          patch(null, newStartVNode, container, oldStartVNode.el)
+          // 没找到的节点
+          unmount(oldVNode)
         }
-        // 更新newstart的位置
-        newStartVNode = newChildren[++newStartIndex]
-      }
-    }
-    // 循环完毕 检查是否有遗漏
-
-    // 新增节点 存在新节点未被处理
-    if (oldStartIndex < oldEndIndex && newStartIndex <= newEndIndex) {
-      for (let index = newStartIndex; index < newEndIndex; index++) {
-        patch(null, newChildren[index], container, oldStartVNode.el)
-      }
-    }
-    // 被卸载的节点
-    else if (oldStartIndex <= oldEndIndex && newStartIndex > newEndIndex) {
-      for (let index = oldStartIndex; index <= oldEndIndex; index++) {
-        unmount(oldChildren[index])
       }
     }
   }
