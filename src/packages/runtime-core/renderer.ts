@@ -1,4 +1,4 @@
-import { isArray, isPlainObject, isString } from '../shared/index'
+import { getSequence, isArray, isPlainObject, isString } from '../shared/index'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
 function shouldSetAsProps(el, key, value) {
@@ -162,7 +162,7 @@ export function createRenderer(options = nodeOptions) {
     }
   }
 
-  function mountElement(vnode: VNode, container: Element, referenceNode) {
+  function mountElement(vnode: VNode, container: Element, referenceNode = null) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
      * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innerHtml = ''
@@ -351,32 +351,36 @@ export function createRenderer(options = nodeOptions) {
         patch(null, newChildren[j++], container, anchor)
       }
     }
+    // 4、多余的旧节点
     else if (j > newEnd && j <= oldEnd) {
       while (j <= oldEnd) {
         unmount(oldChildren[j++])
       }
     }
+    // 5、非理想状态下
     else {
-      // 进行最长递增子序列
-      // 1、创建一个数组填充为-1
+      // 1、计算新的一组子节点未处理的数量
       const count = newEnd - j + 1
+      // 进行填充 - 1
       const source = new Array(count).fill(-1) // [-1, -1, -1, -1]
       const oldStart = j
       const newStart = j
-      // 用于填充新节点在旧节点上的索引位置 复杂度太高了
-      // for (let index = oldStart; index <= oldEnd; index++) {
+      // // 用于填充新节点在旧节点上的索引位置 复杂度太高了
+      // for (let index = j; index <= oldEnd; index++) {
       //   const oldVNode = oldChildren[index]
-      //   for (let k = newStart; k <= newEnd; k++) {
+      //   for (let k = j; k <= newEnd; k++) {
       //     const newVNode = newChildren[k]
       //     // 找到可复用的元素
       //     if (oldVNode.key === newChildren.key) {
+      //       // 还是需要更新的
       //       patch(oldVNode, newVNode, container)
-      //       source[k - newStart] = index
+      //       source[k - j] = index
       //     }
       //   }
       // }
       let moved = false
       let pos = 0
+      // 代表更新过的节点数量
       let pathced = 0
       const keyIndex: Record<any, number> = {}
       for (let index = oldStart; index <= oldEnd; index++) {
@@ -386,23 +390,68 @@ export function createRenderer(options = nodeOptions) {
       // 遍历旧节点剩余的未处理的节点
       for (let index = oldStart; index <= oldEnd; index++) {
         const oldVNode = oldChildren[index]
-        const k = keyIndex[oldVNode.key]
-        if (typeof k !== 'undefined') {
-          newVNode = newChildren[k]
-          pathced++
-          patch(oldVNode, newVNode, container)
-          // 数组
-          source[k - newStart] = index
-          if (k < pos) {
-            moved = true
+        // 如果更新的数量小于等于需要更新的数量 继续走逻辑 否则直接卸载掉 因为是多余的
+        if (pathced <= count) {
+          // 新节点在在旧节点的索引
+          const k = keyIndex[oldVNode.key]
+          if (typeof k !== 'undefined') {
+            newVNode = newChildren[k]
+            pathced++
+            patch(oldVNode, newVNode, container)
+            // 数组
+            source[k - newStart] = index
+            // 这里的逻辑和简单diff算法类似
+            if (k < pos) {
+              // 这里确定是要移动的
+              moved = true
+            }
+            else {
+              pos = k
+            }
           }
           else {
-            pos = k
+            // 在新的一组子节点没找到对应的key 那么直接卸载
+            unmount(oldVNode)
           }
         }
         else {
-          // 没找到的节点
           unmount(oldVNode)
+        }
+      }
+      // 如果moved是为真 则需要进行dom移动操作
+      if (moved) {
+        const seq = getSequence(source)
+        // 指向最长递增子序列的最后一个元素
+        let s = seq.length - 1
+        // 指向新的一组子节点的最后一个元素
+        for (let i = count - 1; i >= 0; i++) {
+          if (source[i] === -1) {
+            // 全新的节点
+            const pos = i + j
+            // 找到对应的vnode
+            const newVNode = newChildren[pos]
+
+            // 找到锚点
+            const nextPos = pos + 1
+            const anchor = nextPos < newChildren.length ? newChildren[nextPos].el : null
+
+            // 因为我们最后是需要挂载的
+            patch(null, newVNode, container, anchor)
+          }
+          else if (i !== seq[s]) {
+            // 真正需要移动的节点
+            const pos = i + j
+            const newVNode = newChildren[pos]
+            // 找到锚点
+            const nextPos = pos + 1
+            const anchor = nextPos < newChildren.length ? newChildren[nextPos].el : null
+            insert(newVNode.el, container, anchor)
+          }
+          else {
+            // 不需要移动的节点 也是就是最长递增子序列的节点
+            // 只需要让s指向下一个位置
+            s--
+          }
         }
       }
     }
