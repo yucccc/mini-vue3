@@ -63,8 +63,27 @@ const newVnodeEsayDiff = {
   ],
 }
 
-renderer.render(oldVnodeEsayDiff, document.querySelector('#app'))
+const ComponentA = {
+  name: 'ComponentA',
+  data() {
+    return {
+      foo: '<===>hello v3',
+    }
+  },
+  render() {
+    return {
+      type: 'div',
+      children: `这是组件ComponentA${this.foo}`,
+    }
+  },
+}
 
-setTimeout(() => {
-  renderer.render(newVnodeEsayDiff, document.querySelector('#app'))
-}, 1000)
+const renderComponent = {
+  type: ComponentA,
+}
+
+renderer.render(renderComponent, document.querySelector('#app'))
+
+// setTimeout(() => {
+//   renderer.render(newVnodeEsayDiff, document.querySelector('#app'))
+// }, 1000)

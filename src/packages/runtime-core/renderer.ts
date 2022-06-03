@@ -1,4 +1,6 @@
 import { getSequence, isArray, isPlainObject, isString } from '../shared/index'
+import { reactive } from '../reactivity/reactive'
+import { effect } from '../reactivity/effect'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
 function shouldSetAsProps(el, key, value) {
@@ -10,7 +12,7 @@ function shouldSetAsProps(el, key, value) {
 // 平台方法
 export const nodeOptions = {
   createElement: (tag: string): Element => document.createElement(tag),
-  setElementText(el, text) {
+  setElementText(el: Element, text: string) {
     el.textContent = text
   },
   /**
@@ -23,11 +25,11 @@ export const nodeOptions = {
     parent.insertBefore(el, referenceNode)
   },
   // 创建文本节点
-  createText(text) {
+  createText(text: string) {
     return document.createTextNode(text)
   },
   // 设置文本节点
-  setText(el, text) {
+  setText(el: Element, text: string) {
     el.nodeValue = text
   },
   patchProp(el: Element, key: string, prevValue, nextValue) {
@@ -66,9 +68,14 @@ export const nodeOptions = {
       }
     }
     else if (key === 'class') {
-      // 可以选的是 setAttribute classList className
-      // className 性能最好
-      el.className = nextValue || ''
+      if (nextValue == null) {
+        el.removeAttribute('class')
+      }
+      else {
+        // 可以选的是 setAttribute classList className
+        // className 性能最好
+        el.className = nextValue
+      }
     }
     // 用in判断key是否存在对应的dom properties
     else if (shouldSetAsProps(el, key, nextValue)) {
@@ -97,6 +104,49 @@ export function createRenderer(options = nodeOptions) {
     createElement, setElementText,
     insert, patchProp, createText, setText,
   } = options
+
+  // 任务队列缓存
+  const queue = new Set()
+  let isFlushing = fasle
+  const p = Promise.resolve()
+  const queueJob = (job) => {
+    queue.add(job)
+    if (!isFlushing) {
+      isFlushing = true
+      p.then(() => {
+        try {
+          queue.forEach(job => job())
+        }
+        finally {
+          isFlushing = false
+          queue.clear()
+        }
+      })
+    }
+  }
+  /**
+   * 全新的组件挂载
+   * @param n2 节点
+   * @param container 容器
+   * @param anchor 锚点
+   */
+  const mountComponent = (n2, container: Element, anchor) => {
+    const componentOptions = n2.type
+    const { render, data } = componentOptions
+    const state = reactive(data())
+
+    effect(() => {
+      // 把this指向了state
+      const subTree = render.call(state)
+      patch(null, subTree, container, anchor)
+    }, {
+      scheduler: queueJob,
+    })
+  }
+  // 更新组件
+  const patchComponent = () => {
+
+  }
   /**
    * 打补丁 -> 更新
    * @param n1 旧节点
@@ -152,17 +202,22 @@ export function createRenderer(options = nodeOptions) {
         patchChildren(n1.children, n2.children, container)
       }
     }
+    // 渲染组件
     else if (isPlainObject(type)) {
-      // TODO: 未实现渲染子组件逻辑
-      console.info('组件')
+      if (!n1) {
+        mountComponent(n2, container, referenceNode)
+      }
+      else {
+        patchComponent()
+      }
     }
+
     else {
       // TODO: 未实现其他type类型逻辑
       console.info('其他类型')
     }
   }
-
-  function mountElement(vnode: VNode, container: Element, referenceNode = null) {
+  function mountElement(vnode: VNode, container: Element, referenceNode: Element | null = null) {
     /**
      * 为什么需要el和vnode建立联系 因为在后续的渲染中
      * 1、卸载过程中 需要根据vnode去获取真实的el 执行移除操作 而不是简单的innerHtml = ''
