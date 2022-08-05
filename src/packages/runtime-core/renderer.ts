@@ -107,7 +107,7 @@ export function createRenderer(options = nodeOptions) {
 
   // 任务队列缓存
   const queue = new Set()
-  let isFlushing = fasle
+  let isFlushing = false
   const p = Promise.resolve()
   const queueJob = (job) => {
     queue.add(job)
