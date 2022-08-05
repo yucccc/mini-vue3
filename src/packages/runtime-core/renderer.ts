@@ -130,21 +130,45 @@ export function createRenderer(options = nodeOptions) {
    * @param container 容器
    * @param anchor 锚点
    */
-  const mountComponent = (n2, container: Element, anchor) => {
-    const componentOptions = n2.type
-    const { render, data } = componentOptions
+  const mountComponent = (vnode: VNode, container: Element, anchor) => {
+    const componentOptions = vnode.type
+    const { render, data, beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions
     const state = reactive(data())
-
+    beforeCreate && beforeCreate.call(state)
+    // 定义组件实例 一个组件实例本质上就是一个对象 包含了与组件有关的状态信息
+    const instance = {
+      // 组件自身的状态数据
+      state,
+      // 一个布尔值 用来表示组件是否已经被挂载
+      isMounted: false,
+      // 组件所渲染的内容 子树
+      subTree: null,
+    }
+    vnode.component = instance
+    created && created()
     effect(() => {
       // 把this指向了state
-      const subTree = render.call(state)
-      patch(null, subTree, container, anchor)
+      const subTree = render.call(state, state)
+      // 已经挂载了
+      if (instance.isMounted) {
+        // bug: 如果在钩子函数中修改了state effect 的防循环机制会导致state不更新
+        beforeUpdate && beforeUpdate.call(state)
+        patch(instance.subTree, subTree, container, anchor)
+        updated && updated.call(state)
+      }
+      else {
+        beforeMount && beforeMount.call(state)
+        patch(null, subTree, container, anchor)
+        instance.isMounted = true
+        mounted && mounted.call(state)
+      }
+      instance.subTree = subTree
     }, {
       scheduler: queueJob,
     })
   }
   // 更新组件
-  const patchComponent = () => {
+  const patchComponent = (n1, n2, referenceNode) => {
 
   }
   /**
@@ -204,11 +228,13 @@ export function createRenderer(options = nodeOptions) {
     }
     // 渲染组件
     else if (isPlainObject(type)) {
-      if (!n1) {
-        mountComponent(n2, container, referenceNode)
+      if (n1) {
+        // 更新组件
+        patchComponent(n1, n2, referenceNode)
       }
       else {
-        patchComponent()
+        // 挂载组件
+        mountComponent(n2, container, referenceNode)
       }
     }
 
