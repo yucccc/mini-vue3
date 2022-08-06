@@ -70,16 +70,25 @@ const ComponentA = {
       foo: '<===>hello v3',
     }
   },
+  props: {
+    title: String,
+  },
   render() {
     return {
       type: 'div',
-      children: `这是组件ComponentA${this.foo}`,
+      children: `这是组件ComponentA${this.foo} title === >${this.title}`,
     }
   },
 }
+setTimeout(() => {
+  renderComponent.props.title = '1s后修改'
+}, 1000)
 
 const renderComponent = {
   type: ComponentA,
+  props: {
+    title: '父组件传递过来的props title',
+  },
 }
 
 renderer.render(renderComponent, document.querySelector('#app'))

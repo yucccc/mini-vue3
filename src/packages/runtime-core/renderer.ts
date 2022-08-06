@@ -1,5 +1,5 @@
 import { getSequence, isArray, isPlainObject, isString } from '../shared/index'
-import { reactive } from '../reactivity/reactive'
+import { reactive, shallowReactive } from '../reactivity/reactive'
 import { effect } from '../reactivity/effect'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
@@ -101,8 +101,12 @@ export const nodeOptions = {
  */
 export function createRenderer(options = nodeOptions) {
   const {
-    createElement, setElementText,
-    insert, patchProp, createText, setText,
+    createElement,
+    setElementText,
+    insert,
+    patchProp,
+    createText,
+    setText,
   } = options
 
   // 任务队列缓存
@@ -131,24 +135,65 @@ export function createRenderer(options = nodeOptions) {
    * @param anchor 锚点
    */
   const mountComponent = (vnode: VNode, container: Element, anchor) => {
+    console.log('%c [ mountComponent ]-138-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
     const componentOptions = vnode.type
-    const { render, data, beforeCreate, created, beforeMount, mounted, beforeUpdate, updated } = componentOptions
+    const {
+      render, data, beforeCreate,
+      // 组件内定义接收的props
+      props: propsOption,
+      created, beforeMount, mounted, beforeUpdate, updated,
+    } = componentOptions
+    // 解析出哪些是props 哪些是attar 被定义的就是props 未被定义的就是attr
+    const [props, attrs] = resolveProps(propsOption, vnode.props)
+
+    beforeCreate && beforeCreate()
+
     const state = reactive(data())
-    beforeCreate && beforeCreate.call(state)
+
     // 定义组件实例 一个组件实例本质上就是一个对象 包含了与组件有关的状态信息
     const instance = {
       // 组件自身的状态数据
       state,
+      props: shallowReactive(props),
       // 一个布尔值 用来表示组件是否已经被挂载
       isMounted: false,
       // 组件所渲染的内容 子树
       subTree: null,
     }
     vnode.component = instance
-    created && created()
+
+    const renderContext = new Proxy(instance, {
+      get(t, key, r) {
+        const { state, props } = t
+        if (state && key in state) {
+          return state[key]
+        }
+        else if (key in props) {
+          return props[key]
+        }
+        else {
+          return console.log('[ 不存在 ] >')
+        }
+      },
+      set(t, key, v, r) {
+        const { state, props } = t
+        if (state && key in state) {
+          state[key] = v
+        }
+        else if (key in props) {
+          console.log('[ 不允许修改props ] >')
+        }
+        else {
+          console.log('%c [ 不存在 ]-187-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
+        }
+      },
+    })
+
+    created && created.call(renderContext)
+
     effect(() => {
       // 把this指向了state
-      const subTree = render.call(state, state)
+      const subTree = render.call(renderContext, renderContext)
       // 已经挂载了
       if (instance.isMounted) {
         // bug: 如果在钩子函数中修改了state effect 的防循环机制会导致state不更新
@@ -169,7 +214,54 @@ export function createRenderer(options = nodeOptions) {
   }
   // 更新组件
   const patchComponent = (n1, n2, referenceNode) => {
+    console.log('%c [ patchComponent ]-188-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
+    const instance = (n2.component = n1.component)
+    const { props } = instance
+    // 检查props是否发生了变化
+    if (hasPropsChanged(n1.props, n2.props)) {
+      const [nextProps] = resolveProps(n2.type.props, n2.props)
+      for (const k in nextProps) {
+        props[k] = nextProps[k]
+      }
+      for (const k in props) {
+        if (!(k in nextProps)) { delete props[k] }
+      }
+    }
+  }
 
+  function hasPropsChanged(prevProps, nextProps) {
+    const p = Object.keys(prevProps)
+    // 长度已经不相等了
+    if (p.length !== Object.keys(nextProps).length) {
+      return true
+    }
+    for (let index = 0; index < p.length; index++) {
+      const key = nextProps[index]
+      // 值不相等 说明发生了变化
+      if (nextProps[key] !== prevProps[key]) { return true }
+    }
+    return false
+  }
+  /**
+   *
+   * @param options 自身定义
+   * @param propsData 父组件传递
+   * @returns
+   */
+  const resolveProps = (options, propsData): [any, any] => {
+    const props = {}
+    const attrs = {}
+    for (const key in propsData) {
+      const v = propsData[key]
+      if (key in options) {
+        // 将父组件的值解析下去
+        props[key] = v
+      }
+      else {
+        attrs[key] = v
+      }
+    }
+    return [props, attrs]
   }
   /**
    * 打补丁 -> 更新
