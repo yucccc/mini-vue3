@@ -167,7 +167,12 @@ export function createRenderer(options = nodeOptions) {
       // 组件所渲染的内容 子树
       subTree: null,
     }
-    const setupContext = { attrs }
+
+    function emit(eventName: string, ...playload: any[]) {
+      eventName = `on${eventName[0].toUpperCase() + eventName.slice(1)}`
+      instance.props[eventName](...playload)
+    }
+    const setupContext = { attrs, emit }
     const setupResult = setup && setup.call(state, shallowReadonly(instance.props), setupContext)
 
     let setupState = null
@@ -284,7 +289,7 @@ export function createRenderer(options = nodeOptions) {
     const attrs = {}
     for (const key in propsData) {
       const v = propsData[key]
-      if (key in options) {
+      if (key in options || key.startsWith('on')) {
         // 将父组件的值解析下去
         props[key] = v
       }

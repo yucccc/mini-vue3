@@ -73,7 +73,8 @@ const ComponentA = {
   props: {
     title: String,
   },
-  setup(props, { attrs }) {
+  setup(props, { attrs, emit }) {
+    emit('change', '子组件触发传参')
     // return {
     //   a: 1,
     // }
@@ -96,10 +97,16 @@ setTimeout(() => {
   renderComponent.props.title = '1s后修改'
 }, 1000)
 
+const handerChange = (v) => {
+  console.log('%c [ 监听到子组件消息  ]-100-「main」', 'font-size:13px; background:pink; color:#bf2c9f;', v)
+}
+
 const renderComponent = {
   type: ComponentA,
   props: {
     title: '父组件传递过来的props title',
+    // 监听子组件的消息
+    onChange: handerChange,
   },
 }
 
