@@ -1,5 +1,5 @@
 import { getSequence, isArray, isPlainObject, isString } from '../shared/index'
-import { reactive, shallowReactive } from '../reactivity/reactive'
+import { reactive, shallowReactive, shallowReadonly } from '../reactivity/reactive'
 import { effect } from '../reactivity/effect'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
@@ -137,10 +137,12 @@ export function createRenderer(options = nodeOptions) {
   const mountComponent = (vnode: VNode, container: Element, anchor) => {
     console.log('%c [ mountComponent ]-138-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
     const componentOptions = vnode.type
-    const {
+    let {
       render, data, beforeCreate,
       // 组件内定义接收的props
       props: propsOption,
+      setup,
+      render,
       created, beforeMount, mounted, beforeUpdate, updated,
     } = componentOptions
     // 解析出哪些是props 哪些是attar 被定义的就是props 未被定义的就是attr
@@ -148,7 +150,7 @@ export function createRenderer(options = nodeOptions) {
 
     beforeCreate && beforeCreate()
 
-    const state = reactive(data())
+    const state = data ? reactive(data()) : null
 
     // 定义组件实例 一个组件实例本质上就是一个对象 包含了与组件有关的状态信息
     const instance = {
@@ -160,6 +162,19 @@ export function createRenderer(options = nodeOptions) {
       // 组件所渲染的内容 子树
       subTree: null,
     }
+    const setupContext = { attrs }
+    const setupResult = setup(shallowReadonly(instance.props), setupContext)
+
+    let setupState = null
+    // 返回了一个函数 需要忽略render
+    if (typeof setupResult === 'function') {
+      if (render) { console.error('setup已经返回了函数 render函数将被忽略') }
+      render = setupResult
+    }
+    else {
+      setupState = setupResult
+    }
+
     vnode.component = instance
 
     const renderContext = new Proxy(instance, {
@@ -171,20 +186,31 @@ export function createRenderer(options = nodeOptions) {
         else if (key in props) {
           return props[key]
         }
+        else if (setupState && key in setupState) {
+          return setupState[key]
+        }
         else {
           return console.log('[ 不存在 ] >')
         }
       },
-      set(t, key, v, r) {
+      set(t, key, v) {
         const { state, props } = t
         if (state && key in state) {
           state[key] = v
+          return true
         }
         else if (key in props) {
           console.log('[ 不允许修改props ] >')
+          return false
+        }
+        else if (setupState && key in setupState) {
+          console.log('[ 不允许修改props ] >')
+          setupState[key] = v
+          return true
         }
         else {
           console.log('%c [ 不存在 ]-187-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
+          return false
         }
       },
     })
@@ -196,7 +222,7 @@ export function createRenderer(options = nodeOptions) {
       const subTree = render.call(renderContext, renderContext)
       // 已经挂载了
       if (instance.isMounted) {
-        // bug: 如果在钩子函数中修改了state effect 的防循环机制会导致state不更新
+        // BUG: 如果在钩子函数中修改了state effect 的防循环机制会导致state不更新
         beforeUpdate && beforeUpdate.call(state)
         patch(instance.subTree, subTree, container, anchor)
         updated && updated.call(state)
@@ -248,7 +274,7 @@ export function createRenderer(options = nodeOptions) {
    * @param propsData 父组件传递
    * @returns
    */
-  const resolveProps = (options, propsData): [any, any] => {
+  function resolveProps(options, propsData): [any, any] {
     const props = {}
     const attrs = {}
     for (const key in propsData) {
