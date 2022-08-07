@@ -138,12 +138,17 @@ export function createRenderer(options = nodeOptions) {
     console.log('%c [ mountComponent ]-138-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
     const componentOptions = vnode.type
     let {
-      render, data, beforeCreate,
+      data,
+      beforeCreate,
       // 组件内定义接收的props
       props: propsOption,
       setup,
       render,
-      created, beforeMount, mounted, beforeUpdate, updated,
+      created,
+      beforeMount,
+      mounted,
+      beforeUpdate,
+      updated,
     } = componentOptions
     // 解析出哪些是props 哪些是attar 被定义的就是props 未被定义的就是attr
     const [props, attrs] = resolveProps(propsOption, vnode.props)
@@ -163,7 +168,7 @@ export function createRenderer(options = nodeOptions) {
       subTree: null,
     }
     const setupContext = { attrs }
-    const setupResult = setup(shallowReadonly(instance.props), setupContext)
+    const setupResult = setup && setup(shallowReadonly(instance.props), setupContext)
 
     let setupState = null
     // 返回了一个函数 需要忽略render
