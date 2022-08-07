@@ -3,6 +3,11 @@ import { reactive, shallowReactive, shallowReadonly } from '../reactivity/reacti
 import { effect } from '../reactivity/effect'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
+// 当前执行的实例
+let currentInstance = null
+function setCurrentInstance(instance) {
+  currentInstance = instance
+}
 function shouldSetAsProps(el, key, value) {
   if (key === 'form' && el.tagName === 'INPUT') {
     return false
@@ -93,7 +98,14 @@ export const nodeOptions = {
     }
   },
 }
-
+export function onMounted(fn) {
+  if (currentInstance) {
+    currentInstance.mounted.push(fn)
+  }
+  else {
+    console.log('%c [ 只能在setup里面调用 ]-106-「renderer」', 'font-size:13px; background:pink; color:#bf2c9f;')
+  }
+}
 /**
  * 创建一个渲染器
  * 渲染器的作用：把虚拟dom渲染为特定平台上的真实元素
@@ -156,7 +168,7 @@ export function createRenderer(options = nodeOptions) {
     beforeCreate && beforeCreate()
 
     const state = data ? reactive(data()) : null
-
+    const slots = vnode.children || {}
     // 定义组件实例 一个组件实例本质上就是一个对象 包含了与组件有关的状态信息
     const instance = {
       // 组件自身的状态数据
@@ -166,14 +178,23 @@ export function createRenderer(options = nodeOptions) {
       isMounted: false,
       // 组件所渲染的内容 子树
       subTree: null,
+      slots,
+      // 存储要执行的生命周期
+      mounted: [],
     }
 
     function emit(eventName: string, ...playload: any[]) {
       eventName = `on${eventName[0].toUpperCase() + eventName.slice(1)}`
       instance.props[eventName](...playload)
     }
-    const setupContext = { attrs, emit }
+
+    const setupContext = { attrs, emit, slots }
+
+    setCurrentInstance(instance)
+
     const setupResult = setup && setup.call(state, shallowReadonly(instance.props), setupContext)
+
+    setCurrentInstance(null)
 
     let setupState = null
     // 返回了一个函数 需要忽略render
@@ -190,6 +211,7 @@ export function createRenderer(options = nodeOptions) {
     const renderContext = new Proxy(instance, {
       get(t, key, r) {
         const { state, props } = t
+        if (key === '$slots') { return slots }
         if (state && key in state) {
           return state[key]
         }
@@ -241,7 +263,8 @@ export function createRenderer(options = nodeOptions) {
         beforeMount && beforeMount.call(state)
         patch(null, subTree, container, anchor)
         instance.isMounted = true
-        mounted && mounted.call(state)
+        // mounted && mounted.call(state)
+        instance.mounted.length && instance.mounted.forEach(hook => hook.call(renderContext))
       }
       instance.subTree = subTree
     }, {
