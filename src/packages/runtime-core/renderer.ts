@@ -168,7 +168,7 @@ export function createRenderer(options = nodeOptions) {
       subTree: null,
     }
     const setupContext = { attrs }
-    const setupResult = setup && setup(shallowReadonly(instance.props), setupContext)
+    const setupResult = setup && setup.call(state, shallowReadonly(instance.props), setupContext)
 
     let setupState = null
     // 返回了一个函数 需要忽略render

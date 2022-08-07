@@ -73,10 +73,22 @@ const ComponentA = {
   props: {
     title: String,
   },
+  setup(props, { attrs }) {
+    // return {
+    //   a: 1,
+    // }
+    const a = 1
+    return () => {
+      return {
+        type: 'p',
+        children: `这是组件ComponentA${this.foo} | title === >${props.title} | setup 传递 ${a} | `,
+      }
+    }
+  },
   render() {
     return {
       type: 'div',
-      children: `这是组件ComponentA${this.foo} title === >${this.title}`,
+      children: `这是组件ComponentA${this.foo} title === >${this.title} setup 传递 ${this.a}`,
     }
   },
 }
