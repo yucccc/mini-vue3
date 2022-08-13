@@ -4,7 +4,8 @@ import { effect } from '../reactivity/effect'
 import type { VNode } from './vnode'
 import { Comment, Fragment, Text } from './vnode'
 // 当前执行的实例
-let currentInstance = null
+export let currentInstance = null
+
 function setCurrentInstance(instance) {
   currentInstance = instance
 }
@@ -181,6 +182,18 @@ export function createRenderer(options = nodeOptions) {
       slots,
       // 存储要执行的生命周期
       mounted: [],
+      // 只有keepalive组件的实例才有keepalive属性
+      keepAliveCtx: null
+    }
+    const isKeepAlive = vnode.type.__isKeepAlive
+    if (isKeepAlive) {
+      // 在keepalive组件实例上添加keepalive对象
+      instance.keepAliveCtx = {
+        move(vnode, container, anchor) {
+          insert(vnode.component.subTree.el, container, anchor)
+        },
+        createElement
+      }
     }
 
     function emit(eventName: string, ...playload: any[]) {
@@ -378,14 +391,19 @@ export function createRenderer(options = nodeOptions) {
       }
     }
     // 渲染组件
-    else if (isPlainObject(type)) {
+    else if (typeof type === 'object' || typeof type === 'function') {
       if (n1) {
         // 更新组件
         patchComponent(n1, n2, referenceNode)
       }
       else {
-        // 挂载组件
-        mountComponent(n2, container, referenceNode)
+        // 如果组件已经被keepalive 那么不会重新挂载 而是激活他
+        if (n2.keptAlive) {
+          n2.keepAliveInstance._activate(n2, container, referenceNode)
+        } else {
+          // 挂载组件
+          mountComponent(n2, container, referenceNode)
+        }
       }
     }
 
@@ -692,8 +710,15 @@ export function createRenderer(options = nodeOptions) {
     // 如果是片段 卸载的时候需要卸载子层
     if (vnode.type === Fragment) {
       return vnode.children.forEach(unmount)
+    } else if (typeof vnode.type === 'object') {
+      if (vnode.shouldKeepAlive) {
+        // 对于需要被keepalive 的组件不应该真的卸载 而是把他隐藏起来
+        vnode.keepAliveInstance._deActivate(vnode)
+      } else {
+        unmount(vnode.children.subTree)
+      }
     }
-    const parent = vnode.el!.parentNode
+     const parent = vnode.el!.parentNode
     if (parent) { parent.removeChild(vnode.el) }
   }
   /**
