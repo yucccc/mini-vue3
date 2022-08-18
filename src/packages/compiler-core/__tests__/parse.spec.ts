@@ -23,11 +23,30 @@ it('my-base-parse2 ', () => {
   )
 })
 
-it('my-base-parse2 ', () => {
+it('my-base-parse3 ', () => {
   const tmp1 = '<div>/div>'
   expect(tokenize(tmp1)).toEqual([
     { name: 'div', type: 'tag' },
     { content: '/div>', type: 'text' },
+  ],
+  )
+})
+
+it('嵌套', () => {
+  const tmp = '<div>1<div>2</div><div>3<div>4</div></div></div>'
+  expect(tokenize(tmp)).toEqual([
+    { name: 'div', type: 'tag' },
+    { content: '1', type: 'text' },
+    { name: 'div', type: 'tag' },
+    { content: '2', type: 'text' },
+    { name: 'div', type: 'tagEnd' },
+    { name: 'div', type: 'tag' },
+    { content: '3', type: 'text' },
+    { name: 'div', type: 'tag' },
+    { content: '4', type: 'text' },
+    { name: 'div', type: 'tagEnd' },
+    { name: 'div', type: 'tagEnd' },
+    { name: 'div', type: 'tagEnd' },
   ],
   )
 })
