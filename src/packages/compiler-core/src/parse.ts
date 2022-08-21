@@ -123,7 +123,7 @@ interface Root {
   type: string
   tag?: string
   content?: string
-  children: Root[]
+  children?: Root[]
 }
 
 export function parse(str: string): Root {
@@ -148,7 +148,7 @@ export function parse(str: string): Root {
           children: [],
         }
         // 需要将他添加到父节点的children 中
-        parent.children.push(elementNode)
+        parent.children!.push(elementNode)
         // 压栈
         elementStack.push(elementNode)
         break
@@ -157,10 +157,8 @@ export function parse(str: string): Root {
         const textNode = {
           type: 'Text',
           content: t.content,
-          // text是无子节点的了 这里只是为了ts暂时通过
-          children: [],
         }
-        parent.children.push(textNode)
+        parent.children!.push(textNode)
         break
       }
       case 'tagEnd': {
@@ -171,4 +169,73 @@ export function parse(str: string): Root {
     tokens.shift()
   }
   return root
+}
+
+// 展示ast节点
+export function dump(node: Root, indent = 0) {
+  const type = node.type
+  const desc = node.type === 'Root'
+    ? ''
+    : node.type === 'Element'
+      ? node.tag
+      : node.content // 文本
+
+  console.log(`${'-'.repeat(indent)}${type}: ${desc}`)
+  if (node.children) {
+    node.children.forEach(n => dump(n, indent + 2))
+  }
+}
+
+// 用于深度优先遍历ast
+export function traverseNode(ast: Root, context: Context) {
+  context.currentNode = ast
+  const transforms = context.nodeTransforms
+  // 执行转换函数 如果一直写在这里很很臃肿
+  transforms.forEach(n => n(context.currentNode, context))
+
+  const children = context.currentNode.children
+
+  if (children) {
+    children.forEach((n, index) => {
+      context.parent = context.currentNode
+      context.childIndex = index
+      traverseNode(n, context)
+    })
+  }
+}
+// 转换标签节点
+export function transformElement(ast: Root, b: Context) {
+  // if (ast.type === 'Element') {
+  //   ast.tag = 'h1'
+  // }
+}
+// 转换文本节点
+export function transformText(ast: Root, b: Context) {
+
+}
+interface Context {
+  // 当前正在转换的节点
+  currentNode: Root
+  // 转换函数
+  nodeTransforms: ((a: Root, b: Context) => void)[]
+  // 当前节点在父节点中的索引
+  childIndex: number
+  parent: Root | null
+}
+
+export function transform(ast: Root) {
+  const context: Context = {
+    // 当前正在转换的节点
+    currentNode: null!,
+    // 当前节点在父节点中的索引
+    childIndex: 0,
+    // 当前转换节点的父节点
+    parent: null,
+    nodeTransforms: [
+      transformElement,
+      transformText,
+    ],
+  }
+  traverseNode(ast, context)
+  dump(ast)
 }

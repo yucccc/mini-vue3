@@ -53,7 +53,7 @@ it('嵌套', () => {
 
 it('parse 纯文本 ', () => {
   const tmp1 = 'div'
-  expect(parse(tmp1)).toEqual({ children: [{ children: [], content: 'div', type: 'Text' }], type: 'Root' })
+  expect(parse(tmp1)).toEqual({ children: [{ content: 'div', type: 'Text' }], type: 'Root' })
 })
 
 it('parse正常标签 ', () => {
@@ -70,14 +70,14 @@ it('parse正常标签 ', () => {
               type: 'Element',
               tag: 'p',
               children: [
-                { children: [], content: 'Vue', type: 'Text' },
+                { content: 'Vue', type: 'Text' },
               ],
             },
             {
               type: 'Element',
               tag: 'p',
               children: [
-                { children: [], content: 'template', type: 'Text' },
+                { content: 'template', type: 'Text' },
               ],
             },
           ],

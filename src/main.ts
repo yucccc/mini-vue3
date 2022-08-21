@@ -1,6 +1,7 @@
 import './style.css'
 import { effect } from './packages/reactivity/effect'
 import { reactive } from './packages/reactivity/reactive'
+import { dump, parse, transform, traverseNode } from './packages/compiler-core/src/parse'
 import { createRenderer } from './packages/runtime-core/renderer'
 // const originalObj = { text: 'hello vue3', ok: true }
 
@@ -115,3 +116,7 @@ renderer.render(renderComponent, document.querySelector('#app'))
 // setTimeout(() => {
 //   renderer.render(newVnodeEsayDiff, document.querySelector('#app'))
 // }, 1000)
+
+const ast = parse('<div><p>Vue</p><p>template</p></div>')
+
+transform(ast)
