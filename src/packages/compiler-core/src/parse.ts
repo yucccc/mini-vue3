@@ -13,7 +13,7 @@ const enum State {
 }
 // 判断是否字母
 function isAlpha(char: string) {
-  return char >= 'a' && char <= 'z' || char >= 'A' && char <= 'Z'
+  return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
 }
 
 // 解析
@@ -83,7 +83,6 @@ export function tokenize(str: string) {
         }
         break
       case State.TagEnd:
-
         if (char === '>') { // </>
           console.log('%c [ </> 情况未处理 ]-95-「parse」', 'font-size:13px; background:pink; color:#bf2c9f;')
         }
@@ -119,4 +118,57 @@ export function tokenize(str: string) {
     })
   }
   return tokens
+}
+interface Root {
+  type: string
+  tag?: string
+  content?: string
+  children: Root[]
+}
+
+export function parse(str: string): Root {
+  // 将模版进行标记化
+  const tokens = tokenize(str)
+  // 创建root 根节点
+  const root: Root = {
+    type: 'Root',
+    children: [],
+  }
+  // 起初只有root根节点
+  const elementStack = [root]
+  while (tokens.length) {
+    const parent = elementStack[elementStack.length - 1]
+    const t = tokens[0]
+    switch (t.type) {
+      case 'tag':{
+        // 如果是tag 创建一个节点
+        const elementNode = {
+          type: 'Element',
+          tag: t.name,
+          children: [],
+        }
+        // 需要将他添加到父节点的children 中
+        parent.children.push(elementNode)
+        // 压栈
+        elementStack.push(elementNode)
+        break
+      }
+      case 'text' : {
+        const textNode = {
+          type: 'Text',
+          content: t.content,
+          // text是无子节点的了 这里只是为了ts暂时通过
+          children: [],
+        }
+        parent.children.push(textNode)
+        break
+      }
+      case 'tagEnd': {
+        elementStack.pop()
+        break
+      }
+    }
+    tokens.shift()
+  }
+  return root
 }
