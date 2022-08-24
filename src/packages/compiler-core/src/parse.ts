@@ -191,7 +191,14 @@ export function traverseNode(ast: Root, context: Context) {
   context.currentNode = ast
   const transforms = context.nodeTransforms
   // 执行转换函数 如果一直写在这里很很臃肿
-  transforms.forEach(n => n(context.currentNode, context))
+  transforms.forEach(n => n(context.currentNode!, context))
+  for (let index = 0; index < transforms.length; index++) {
+    transforms[index](context.currentNode!, context)
+    //  任何转换函数都可能将元素移除 如果被移除了 直接停止该循环
+    if (!context.currentNode) {
+      return
+    }
+  }
 
   const children = context.currentNode.children
 
@@ -215,12 +222,14 @@ export function transformText(ast: Root, b: Context) {
 }
 interface Context {
   // 当前正在转换的节点
-  currentNode: Root
+  currentNode: Root | null
   // 转换函数
   nodeTransforms: ((a: Root, b: Context) => void)[]
   // 当前节点在父节点中的索引
   childIndex: number
   parent: Root | null
+  replaceNode: (node: any) => any
+  removeNode: () => void
 }
 
 export function transform(ast: Root) {
@@ -230,7 +239,21 @@ export function transform(ast: Root) {
     // 当前节点在父节点中的索引
     childIndex: 0,
     // 当前转换节点的父节点
-    parent: null,
+    parent: null!,
+    // 用于替换节点 接收新节点作为参数
+    replaceNode(node: any) {
+      if (context.parent && context.parent.children) {
+        context.parent.children[context.childIndex] = node
+        context.currentNode = node
+      }
+    },
+    // 删除节点
+    removeNode() {
+      if (context.parent) {
+        context.parent.children?.splice(context.childIndex, 1)
+        context.currentNode = null
+      }
+    },
     nodeTransforms: [
       transformElement,
       transformText,
