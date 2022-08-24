@@ -189,11 +189,18 @@ export function dump(node: Root, indent = 0) {
 // 用于深度优先遍历ast
 export function traverseNode(ast: Root, context: Context) {
   context.currentNode = ast
+  const exitFns = []
+
   const transforms = context.nodeTransforms
+
   // 执行转换函数 如果一直写在这里很很臃肿
   transforms.forEach(n => n(context.currentNode!, context))
   for (let index = 0; index < transforms.length; index++) {
-    transforms[index](context.currentNode!, context)
+    // 转换函数返回值为退出阶段函数
+    const onExit = transforms[index](context.currentNode!, context)
+    if (onExit) {
+      exitFns.push(onExit)
+    }
     //  任何转换函数都可能将元素移除 如果被移除了 直接停止该循环
     if (!context.currentNode) {
       return
@@ -208,6 +215,10 @@ export function traverseNode(ast: Root, context: Context) {
       context.childIndex = index
       traverseNode(n, context)
     })
+  }
+  let i = exitFns.length
+  while (i--) {
+    exitFns[i]()
   }
 }
 // 转换标签节点
