@@ -222,14 +222,57 @@ export function traverseNode(ast: Root, context: Context) {
   }
 }
 // 转换标签节点
-export function transformElement(ast: Root, b: Context) {
-  // if (ast.type === 'Element') {
-  //   ast.tag = 'h1'
-  // }
+export function transformElement(node: Root, b: Context) {
+  return () => {
+    if (node.type !== 'Element') {
+      return
+    }
+    const callExp = createCallExpression('h', [
+      createStringLiteral(node.tag),
+    ])
+    console.log(callExp)
+
+    node.children?.length === 1
+      ? callExp.arguments.push(node.children[0].jsNode)
+      : callExp.arguments.push(
+        createArrayExpression(node.children?.map(c => c.jsNode)),
+      )
+    node.jsNode = callExp
+  }
 }
 // 转换文本节点
-export function transformText(ast: Root, b: Context) {
+export function transformText(node: Root, b: Context) {
+  if (node.type !== 'Text') {
+    return
+  }
+  node.jsNode = createStringLiteral(node.content)
+}
+const FunctionDecl = 'FunctionDecl'
+const StringLiteral = 'StringLiteral'
+const Identifier = 'Identifier'
+const ArrayExpression = 'ArrayExpression'
+const CallExpression = 'CallExpression'
 
+// 转换根节点
+export function transformRoot(node: Root) {
+  return () => {
+    if (node.type !== 'Root') {
+      return
+    }
+    // 暂时不考虑存在多个根节点的问题
+    const vnodeJSAST = node.children[0].jsNode
+    node.jsNode = {
+      type: FunctionDecl,
+      id: { type: 'Identifier', name: 'render' },
+      params: [],
+      body: [
+        {
+          type: 'ReturnStatement',
+          return: vnodeJSAST,
+        },
+      ],
+    }
+  }
 }
 interface Context {
   // 当前正在转换的节点
@@ -266,10 +309,145 @@ export function transform(ast: Root) {
       }
     },
     nodeTransforms: [
+      transformRoot,
       transformElement,
       transformText,
     ],
   }
   traverseNode(ast, context)
   dump(ast)
+}
+// 创建字符串文字节点
+function createStringLiteral(value) {
+  return {
+    type: StringLiteral,
+    value,
+  }
+}
+// 创建Identifier 节点
+function createIdentifier(name) {
+  return {
+    type: Identifier,
+    name,
+  }
+}
+// 创建arrayExpression 节点
+function createArrayExpression(elements) {
+  return {
+    type: ArrayExpression,
+    elements,
+  }
+}
+
+// 创建arrayExpression 节点
+function createCallExpression(callee: string, args: any[]) {
+  return {
+    type: CallExpression,
+    callee: createIdentifier(callee),
+    arguments: args,
+  }
+}
+function generate(node) {
+  const context = {
+    code: '', // 最终生成的渲染代码,
+    push(code) {
+      context.code += code
+    },
+    currentIndex: 0,
+    newLine() {
+      context.code += `\n${'  '.repeat(context.currentIndex)}`
+    },
+    // 用于缩进 让currentIndet自增后 调用换行函数
+    indent() {
+      context.currentIndex++
+      context.newLine()
+    },
+    // 取消缩进
+    deIndent() {
+      context.currentIndex--
+      context.newLine()
+    },
+  }
+  genNode(node, context)
+  return context.code
+}
+function genNode(node, context) {
+  switch (node.type) {
+    case 'FunctionDecl':
+      genFunctionDecl(node, context)
+      break
+    case 'ReturnStatement':
+      genReturnStatement(node, context)
+      break
+    case 'CallExpression':
+      genCallExpression(node, context)
+      break
+    case 'StringLiteral':
+      genStringLiteral(node, context)
+      break
+    case 'ArrayExpression':
+      genArrayExpression(node, context)
+      break
+  }
+}
+function genNodeList(nodes, context) {
+  const { push } = context
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i]
+    genNode(node, context)
+    if (i < nodes.length - 1) {
+      push(', ')
+    }
+  }
+}
+function genFunctionDecl(node, context) {
+  const { push, indent, deIndent } = context
+
+  push(`function ${node.id.name} `)
+  push('(')
+  genNodeList(node.params, context)
+  push(') ')
+  push('{')
+  indent()
+
+  node.body.forEach(n => genNode(n, context))
+
+  deIndent()
+  push('}')
+}
+
+function genReturnStatement(node, context) {
+  const { push } = context
+
+  push('return ')
+  genNode(node.return, context)
+}
+
+function genCallExpression(node, context) {
+  const { push } = context
+  const { callee, arguments: args } = node
+  push(`${callee.name}(`)
+  genNodeList(args, context)
+  push(')')
+}
+
+function genStringLiteral(node, context) {
+  const { push } = context
+
+  push(`'${node.value}'`)
+}
+
+function genArrayExpression(node, context) {
+  const { push } = context
+  push('[')
+  genNodeList(node.elements, context)
+  push(']')
+}
+
+export function complie(template) {
+  const ast = parse(template)
+  // 将模板ast转为为JavaScript ast
+  transform(ast)
+  const code = generate(ast.jsNode)
+  return code
 }

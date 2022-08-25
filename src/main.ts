@@ -1,7 +1,7 @@
 import './style.css'
 import { effect } from './packages/reactivity/effect'
 import { reactive } from './packages/reactivity/reactive'
-import { dump, parse, transform, traverseNode } from './packages/compiler-core/src/parse'
+import { complie, dump, parse, transform, traverseNode } from './packages/compiler-core/src/parse'
 import { createRenderer } from './packages/runtime-core/renderer'
 // const originalObj = { text: 'hello vue3', ok: true }
 
@@ -39,6 +39,9 @@ const renderer = createRenderer()
 //     { type: 'p', children: '6', key: '4' },
 //   ],
 // }
+const ast = complie('<div><p>Vue</p><p>template</p></div>')
+console.log(ast)
+
 // 复杂情况
 const oldVnodeEsayDiff = {
   type: 'div',
@@ -83,16 +86,16 @@ const ComponentA = {
     return () => {
       return {
         type: 'p',
-        children: `这是组件ComponentA${this.foo} | title === >${props.title} | setup 传递 ${a} | `,
+        children: `这是组件ComponentA${this.foo} | title === >${props.title} | setup 传递 ${a} | 模板编译后的数据${ast}`,
       }
     }
   },
-  render() {
-    return {
-      type: 'div',
-      children: `这是组件ComponentA${this.foo} title === >${this.title} setup 传递 ${this.a}`,
-    }
-  },
+  // render() {
+  //   return {
+  //     type: 'div',
+  //     children: `这是组件ComponentA${this.foo} title === >${this.title} setup 传递 ${this.a}`,
+  //   }
+  // },
 }
 setTimeout(() => {
   renderComponent.props.title = '1s后修改'
@@ -116,7 +119,3 @@ renderer.render(renderComponent, document.querySelector('#app'))
 // setTimeout(() => {
 //   renderer.render(newVnodeEsayDiff, document.querySelector('#app'))
 // }, 1000)
-
-const ast = parse('<div><p>Vue</p><p>template</p></div>')
-
-transform(ast)
