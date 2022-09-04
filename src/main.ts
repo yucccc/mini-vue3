@@ -39,7 +39,7 @@ const renderer = createRenderer()
 //     { type: 'p', children: '6', key: '4' },
 //   ],
 // }
-const ast = complie('<div><p>Vue</p><p>template</p></div>')
+const ast = complie('<div a = "1" >Text</div>')
 console.log(ast)
 
 // 复杂情况

@@ -11,9 +11,15 @@ const enum State {
   TagEnd,
   TagEndName,
 }
-// 判断是否字母
-function isAlpha(char: string) {
-  return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+
+// 文本模式
+export const enum TextModes {
+  //          | Elements | Entities | End sign              | Inside of
+  DATA, //    | ✔        | ✔        | End tags of ancestors | 正常情况
+  RCDATA, //  | ✘        | ✔        | End tag of the parent | <textarea> 无法解析标签 但是能解析字符实体
+  RAWTEXT, // | ✘        | ✘        | End tag of the parent | <style>,<script> 无法解析标签也无法解析字符实体
+  CDATA,
+  ATTRIBUTE_VALUE,
 }
 
 // 解析
@@ -125,52 +131,232 @@ interface Root {
   content?: string
   children?: Root[]
 }
-
+interface ParseContext {
+  source: string
+  mode: TextModes
+  // 消费指定数量的字符
+  advanceBy: (num: number) => void
+  // 空白字符
+  advanceSpaces: () => void
+}
 export function parse(str: string): Root {
-  // 将模版进行标记化
-  const tokens = tokenize(str)
+  const context: ParseContext = {
+    source: str,
+    mode: TextModes.DATA,
+    advanceBy(num) {
+      context.source = context.source.slice(num)
+    },
+    advanceSpaces() {
+      const match = /^[\s]+/.exec(context.source)
+      if (match) {
+        context.advanceBy(match[0].length)
+      }
+    },
+  }
+  const nodes = parseChildren(context, [])
   // 创建root 根节点
-  const root: Root = {
+  return {
     type: 'Root',
-    children: [],
+    children: nodes,
   }
-  // 起初只有root根节点
-  const elementStack = [root]
-  while (tokens.length) {
-    const parent = elementStack[elementStack.length - 1]
-    const t = tokens[0]
-    switch (t.type) {
-      case 'tag':{
-        // 如果是tag 创建一个节点
-        const elementNode = {
-          type: 'Element',
-          tag: t.name,
-          children: [],
-        }
-        // 需要将他添加到父节点的children 中
-        parent.children!.push(elementNode)
-        // 压栈
-        elementStack.push(elementNode)
-        break
-      }
-      case 'text' : {
-        const textNode = {
-          type: 'Text',
-          content: t.content,
-        }
-        parent.children!.push(textNode)
-        break
-      }
-      case 'tagEnd': {
-        elementStack.pop()
-        break
-      }
-    }
-    tokens.shift()
-  }
-  return root
 }
 
+function parseChildren(context: { source: string; mode: TextModes }, ancestors) {
+  const nodes = []
+  const { source, mode } = context
+  while (!isEnd(context, ancestors)) {
+    let node
+    // 只有DATA模式 和 RCDATA模式 才支持插值节点解析
+    if (mode === TextModes.DATA || mode === TextModes.RCDATA) {
+      // 只有DATA模式才支持标签解析
+      if (mode === TextModes.DATA && source[0] === '<') {
+        if (source[1] === '!') {
+          // 注释 <!-- xsxx
+          if (source.startsWith('<!--')) {
+            // node = parseComment(context)
+            node = { type: 'Interpolation3' }
+          }
+          else if (source.startsWith('<![CDATA[')) {
+            // node = parseCDATA(context)
+            node = { type: 'Interpolation2' }
+          }
+        }
+        else if (source[1] === '/') {
+          // 结束标签
+        }
+        else if (/[a-z]/i.test(source[1])) {
+          // 标签
+          node = parseElement(context, ancestors)
+        }
+      }
+      // 解析插值
+      else if (source.startsWith('{{')) {
+        // node = parseInterpolation(context)
+        node = { type: 'Interpolation' }
+      }
+    }
+    // node 不存在 说明处于其他模式 一切按文本处理
+    if (!node) {
+      node = parseText(context)
+    }
+    nodes.push(node)
+  }
+  return nodes
+}
+function isEnd(context: ParseContext, ancestors) {
+  const { source } = context
+  if (!source) { return true }
+  // 与整个父级做比较
+  for (let index = ancestors.length - 1; index >= 0; --index) {
+    if (source.startsWith(`</${ancestors[index].tag}`)) {
+      return true
+    }
+  }
+  return false
+}
+// 解析文本
+function parseText(context: ParseContext) {
+  let endIndex = context.source.length
+  // 找打字符<  的位置  作为停止的位置
+  const ltIndex = context.source.indexOf('<')
+  // 找到插值位置
+  const delimiterIndex = context.source.indexOf('{{')
+  // 如果< 早出现 则作为结尾字符 比如 aasdasdas<p>{{ aa }}</p>
+  if (ltIndex > -1 && ltIndex < endIndex) {
+    endIndex = ltIndex
+  }
+  // {{ 早出现 比如 aasdasdas {{ aa }}<p>x</p>
+  if (delimiterIndex > -1 && delimiterIndex < endIndex) {
+    endIndex = delimiterIndex
+  }
+  const content = context.source.slice(0, endIndex)
+  context.advanceBy(content.length)
+
+  return {
+    type: 'Text',
+    content,
+  }
+}
+
+function parseElement(context: ParseContext, ancestors: any[]) {
+  const element = parseTag(context)
+  if (element) {
+    if (element.isSelfClosing) {
+      return element
+    }
+    if (element.tag === 'textarea' || element.tag === 'title') {
+      // 切换到文本模式 不解析标签 但解析字符实体
+      context.mode = TextModes.RCDATA
+    }
+    else if (/style|xmp|iframe|noembed|noframes|noscript/.test(element.tag)) {
+      // 特殊标签 不解析标签也不解析实体
+      context.mode = TextModes.RAWTEXT
+    }
+    else {
+      context.mode = TextModes.DATA
+    }
+
+    ancestors.push(element)
+
+    element.children = parseChildren(context, ancestors)
+
+    ancestors.pop()
+    if (context.source.startsWith(`</${element.tag}`)) {
+      parseTag(context, 'end')
+    }
+    else {
+      console.log(`${element.tag}缺少闭合标签`)
+    }
+    return element
+  }
+  else {
+    console.log('解析标签出错', context.source)
+    return null
+  }
+}
+function parseTag(context: ParseContext, type: 'start' | 'end' = 'start') {
+  const { advanceBy, advanceSpaces } = context
+  const match = type === 'start'
+    ? /^<([a-z][^\t\r\n\f />]*)/i.exec(context.source)
+    : /^<\/([a-z][^\t\r\n\f />]*)/i.exec(context.source)
+  // ['<div', 'div']
+  if (match) {
+    const tag = match[1] // div
+    advanceBy(match[0].length)
+    advanceSpaces()
+
+    const props = parseAttributes(context)
+    // 被消费完毕后剩下的以/>开头说明是自闭合标签
+    const isSelfClosing = type === 'start' && context.source.startsWith('/>')
+    // 消费完毕
+    advanceBy(isSelfClosing ? 2 : 1)
+    return {
+      type: 'Element',
+      tag,
+      props,
+      children: [],
+      isSelfClosing,
+    }
+  }
+  else {
+    console.log('不是合格的标签', context.source)
+    return null
+  }
+}
+function parseAttributes(context: ParseContext) {
+  const props = []
+  const { advanceBy, advanceSpaces } = context
+  while (
+    !context.source.startsWith('>')
+     && !context.source.startsWith('/>')
+  ) {
+    const match = /^[^\s/>][^\s/>=]*/.exec(context.source)
+    const name = match[0]
+    // 消费属性名 a="xx" => ="xx"
+    advanceBy(name.length)
+    // 消费空格 a = "xx" =>  ="xx"
+    advanceSpaces()
+    // 消费等于号
+    advanceBy(1)
+    // 消费等于号前面的空格
+
+    advanceSpaces()
+    // 属性值
+    let value = ''
+    const quote = context.source[0]
+    const isQuoted = quote === '"' || quote === '\''
+    if (isQuoted) {
+      // 消费引号
+      advanceBy(1)
+      const endQuoteIndex = context.source.indexOf(quote)
+      if (endQuoteIndex > -1) {
+        value = context.source.slice(0, endQuoteIndex) // 得到的可能是 --obj.a-- 包含空格换行
+        // 消费属性值 这里注意的是 属性值包含空格也被消费了
+        advanceBy(value.length)
+        // 消费引号
+        advanceBy(1)
+      }
+      else {
+        console.error('缺少结尾引号')
+      }
+    }
+    else {
+      // 说明属性是这么写的 a=bb 值没写引号
+      const match = /^[^\t\r\n\f >]+/.exec(context.source)
+      if (match) {
+        value = match[0]
+        advanceBy(value.length)
+      }
+    }
+    advanceSpaces()
+    props.push({
+      type: 'Attribute',
+      name,
+      value,
+    })
+  }
+  return props
+}
 // 展示ast节点
 export function dump(node: Root, indent = 0) {
   const type = node.type
@@ -443,11 +629,15 @@ function genArrayExpression(node, context) {
   genNodeList(node.elements, context)
   push(']')
 }
+// 解析字符实体
+function decodeHtml(rawText, asAttr = false) {
+  return rawText
+}
 
 export function complie(template) {
   const ast = parse(template)
   // 将模板ast转为为JavaScript ast
-  transform(ast)
-  const code = generate(ast.jsNode)
-  return code
+  // transform(ast)
+  // const code = generate(ast.jsNode)
+  return ast
 }
